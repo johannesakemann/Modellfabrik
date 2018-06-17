@@ -183,7 +183,7 @@ function post_initialize() {
             browseName: "Production",
             componentOf:Monitoring
         });
-        ProductionAvailability.addReference({referenceType: "OrganizedBy",nodeId:Production});
+        
         var ProcessingMonitoring = addressSpace.addObject({
             browseName: "Processing",
             componentOf: Monitoring
@@ -216,6 +216,7 @@ function post_initialize() {
                 }
             }
         });
+        ProductionAvailability.addReference({referenceType: "OrganizedBy",nodeId:Production});
         //ProduktC
         var ProduktC = addressSpace.addObject({
             browseName: producttypes.C,
@@ -1377,6 +1378,7 @@ function post_initialize() {
 
             return Produkt;
         }
+
 //****** Servererstellung  */
     }
     construct_my_address_space(server);
