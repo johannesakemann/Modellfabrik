@@ -1271,7 +1271,7 @@ function post_initialize() {
             var plcProdukt = produkt.getComponentByName("Body").getComponentByName("ProductLifecycle").getFolderElements();
             var plcToSend = plcProdukt.map(process => process.browseName.toString());
             console.log("Place Order von "+produkt.getComponentByName("Header").getComponentByName("Produktnummer").readValue().value.value+" auf "+maschine.browseName.toString());
-            var orderClient = new opcua.OPCUAClient({keepSessionAlive:true});
+            var orderClient = new opcua.OPCUAClient({keepSessionAlive:true, requestedSessionTimeout: 300000});
             var orderSession;
             var aktCap = getCurrentCapability(produkt);
             var objectId;
