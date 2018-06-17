@@ -1095,7 +1095,10 @@ function post_initialize() {
                 var produktsCurrAuftrag = currAuftrag.getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements();
                 var productCounter = 0;
                 //filter alle nicht fertigen Produkte
-                var notFinishedProduktsCurrAuftrag = produktsCurrAuftrag.filter(p=> (p.getComponentByName("Body").getComponentByName("ProduktStatus").readValue().value.value !== productstat.FINISHED) && (p.getComponentByName("Body").getComponentByName("ProduktStatus").readValue().value.value !== productstat.INPRODUCTION));
+                var notFinishedProduktsCurrAuftragNotSorted = produktsCurrAuftrag.filter(p=> (p.getComponentByName("Body").getComponentByName("ProduktStatus").readValue().value.value !== productstat.FINISHED) && (p.getComponentByName("Body").getComponentByName("ProduktStatus").readValue().value.value !== productstat.INPRODUCTION));
+                var notFinishedProductsCurrAuftragMoreCap = notFinishedProduktsCurrAuftragNotSorted.filter(p => p.getComponentByName("Body").getComponentByName("ProductLifecycle").getComponents().length >1);
+                var notFinishedProductsCurrAuftragLessCap = notFinishedProduktsCurrAuftragNotSorted.filter(p => p.getComponentByName("Body").getComponentByName("ProductLifecycle").getComponents().length == 1);
+                var notFinishedProduktsCurrAuftrag = notFinishedProductsCurrAuftragMoreCap.concat(notFinishedProductsCurrAuftragLessCap);
                 function processNotFinishedProduktsCurrAuftrag(produktIndex){
                     var produkt = notFinishedProduktsCurrAuftrag[produktIndex];
                     if (typeof produkt ===  "undefined"){
@@ -1290,7 +1293,7 @@ function post_initialize() {
                 function(callback){
                     orderClient.createSession(function(err,session){
                         if(!err){                                        
-                            orderSession = session;
+                            orderSession = session;                        
                             callback();
                         }else{
                             console.log(err);
