@@ -748,7 +748,67 @@ function post_initialize() {
                 }
             }
         });
-        Output.addReference({referenceType:"OrganizedBy",nodeId: Production});        
+        Output.addReference({referenceType:"OrganizedBy",nodeId: Production});
+        
+//****** Daten über aktuell produziertes Produkt */
+        var CurrentProductNumber = addressSpace.addVariable({
+            componentOf: Assembler.getComponentByName("Body"),
+            browseName:"CurrentProductNumber",
+            dataType: "String",
+            value:{
+                get: function(){
+                    var currProduct = getCurrentProdukt();
+                    if (currProduct === "NoCurrentProduct"){
+                        return new opcua.Variant({dataType:"String",value: "NoCurrentProduct"})
+                    }else{
+                        var valueToReturn = currProduct.getComponentByName("Header").getComponentByName("Produktnummer").readValue().value.value;
+                        return new opcua.Variant({dataType: "String",value: valueToReturn.toString()});
+                    }
+                }
+            }
+        });
+        CurrentProductNumber.addReference({referenceType:"OrganizedBy",nodeId: Production});
+        var CurrentProductType = addressSpace.addVariable({
+            componentOf: Assembler.getComponentByName("Body"),
+            browseName: "CurrentProductType",
+            dataType:"String",
+            value:{
+                get: function(){
+                    var currProduct = getCurrentProdukt();
+                    if (currProduct === "NoCurrentProduct"){
+                        return new opcua.Variant({dataType:"String",value: "NoCurrentProduct"})
+                    }else{
+                        var valueToReturn = currProduct.getComponentByName("Header").getComponentByName("ProduktTyp").readValue().value.value;
+                        return new opcua.Variant({dataType: "String",value: valueToReturn});
+                    } 
+                }
+            }
+        })
+        CurrentProductType.addReference({referenceType: "OrganizedBy",nodeId: Production});
+        //Hilfsfunktion um aktuelles Produkt zu ermitteln
+        var productionCompletion = 0;
+        var ProductionCompletion = addressSpace.addVariable({
+            componentOf: Assembler.getComponentByName("Body"),
+            browseName: "ProductionCompletion",
+            dataType: "Int32",
+            value:{
+                get: function(){
+                    return new opcua.Variant({dataType: "Int32", value: productionCompletion});
+                }
+            }
+
+        });
+        ProductionCompletion.addReference({referenceType: "OrganizedBy", nodeId: Production});
+
+        function getCurrentProdukt(){
+            var elementsOfMachineBody = Assembler.getComponentByName("Body").getFolderElements();
+            var produktsArrayMachineBody = elementsOfMachineBody.filter(e => e.browseName.toString() === "Produkt");
+            if (produktsArrayMachineBody.length === 0){
+                return "NoCurrentProduct"
+            }else{
+                return produktsArrayMachineBody[0];
+            }
+        }
 
 //****** Instanziieren des Displays */
 
@@ -940,6 +1000,8 @@ function post_initialize() {
                         //console.log(err);
                         if(err){
                             console.log("Error during methodCall of register Method: "+err);
+                        }else{
+                            console.log("Assembler registriert!");
                         }
                         callback(err);
                     });
@@ -954,8 +1016,6 @@ function post_initialize() {
         });
         callCreateObject.execute([],new opcua.SessionContext(),function(err,result){
             if(!err){
-                console.log("Assembler registriert!");
-            }else{
                 console.log(err);
             }
         })
@@ -1034,6 +1094,15 @@ function post_initialize() {
             },{
                 name: "OutputC",
                 dataType: "String"
+            },{
+                name: "CurrentProductNumber",
+                dataType: "String"
+            },{
+                name: "CurrentProductType",
+                dataType: "String"
+            },{
+                name: "ProductionCompletion",
+                dataType: "String"
             }]
         });
         ProvideProductionData.addReference({referenceType:"OrganizedBy",nodeId: Production});
@@ -1047,6 +1116,15 @@ function post_initialize() {
                 },{
                     dataType: "String",
                     value: Output.nodeId.toString()
+                },{
+                    dataType: "String",
+                    value: CurrentProductNumber.nodeId.toString()
+                },{
+                    dataType: "String",
+                    value: CurrentProductType.nodeId.toString()
+                },{
+                    dataType: "String",
+                    value: ProductionCompletion.nodeId.toString()
                 }]
             });
         });
@@ -1277,6 +1355,9 @@ function post_initialize() {
                             input.removeReference(reference);
                         });
                     });
+                    var productionProgress = setInterval(function(){
+                        productionCompletion += (100/TimeToManufacture.readValue().value.value);
+                    },1000)
                     setTimeout(function(){
                         callback(null,{
                             statusCode: opcua.StatusCodes.Good,
@@ -1288,9 +1369,13 @@ function post_initialize() {
                                 value: 0
                             }]
                         });
+                        //Abbrechen progressIntervall
+                        clearInterval(productionProgress);
                         //Erhöhen der OutputC Variable
                         outputCProducing++;
                         console.log("Production of Product "+currentProduct.getComponentByName("Header").getComponentByName("Produktnummer").readValue().value.value+" finished");
+                        //Setzen von ProductionCompletion auf 0
+                        productionCompletion = 0;
                         addressSpace.deleteNode(currentProduct);
                         productionAvailability = true;
                     },TimeToManufacture.readValue().value.value*1000);   

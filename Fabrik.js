@@ -95,9 +95,14 @@ function post_initialize() {
             componentOf: Monitoring
         })
 
+        var CurrOrderMonitoring = addressSpace.addObject({
+            browseName: "CurrentOrder",
+            componentOf: Monitoring
+        })
+
 //****** OPCUA-Methode um Node Ids der aktuellen Auftragsdaten zurückzugeben */
         //TODO: Löschen wenns passt 
-        /*
+        
         var ProvideCurrOrderData = addressSpace.addMethod(Fabrik.getComponentByName("Body"),{
             modellingRule: "Mandatory",
             browseName: "ProvideCurrentOrderData",
@@ -106,17 +111,14 @@ function post_initialize() {
                 name: "Auftragsnummer",
                 dataType: "String"
             },{
-                name: "MengeA",
+                name: "NumberProducts",
                 dataType: "String"
             },{
-                name: "MengeB",
-                dataType: "String"
-            },{
-                name: "MengeC",
+                name: "NumberFinishedProducts",
                 dataType: "String"
             }]
         });
-        ProvideCurrOrderData.addReference({referenceType: "OrganizedBy",nodeId: OrderMonitoring});
+        ProvideCurrOrderData.addReference({referenceType: "OrganizedBy",nodeId: CurrOrderMonitoring});
         ProvideCurrOrderData.bindMethod(function(inputArguments,context,callback){
             callback(null,{
                 statusCode:opcua.StatusCodes.Good,
@@ -125,16 +127,13 @@ function post_initialize() {
                     value: CurrentOrderNumber.nodeId.toString()
                 },{
                     dataType: "String",
-                    value: CurrentOrderVolumeA.nodeId.toString()
+                    value: CurrentOrderNumberOfProducts.nodeId.toString()
                 },{
                     dataType: "String",
-                    value: CurrentOrderVolumeB.nodeId.toString()
-                },{
-                    dataType: "String",
-                    value: CurrentOrderVolumeC.nodeId.toString()
+                    value: CurrentOrderNumberFinishedProducts.nodeId.toString()
                 }]
             });
-        });*/
+        });
 //****** Anlegen Device Management Capability */
         var DeviceManagement = addressSpace.addObject({
             browseName: capabilities.DEVICEMANAGEMENT,
@@ -446,7 +445,7 @@ function post_initialize() {
             }
         });
 //****** Variablen zum Anzeigen aktueller Auftragsdaten */
-        /*
+        
         var CurrentOrderNumber = addressSpace.addVariable({
             componentOf: Fabrik.getComponentByName("Body"),
             dataType: "String",
@@ -462,7 +461,8 @@ function post_initialize() {
                 }
             }
         });
-        CurrentOrderNumber.addReference({referenceType: "OrganizedBy",nodeId: OrderMonitoring});
+        CurrentOrderNumber.addReference({referenceType: "OrganizedBy",nodeId: CurrOrderMonitoring});
+        /*
         var CurrentOrderVolumeA = addressSpace.addVariable({
             componentOf: Fabrik.getComponentByName("Body"),
             dataType: "String",
@@ -511,7 +511,7 @@ function post_initialize() {
             }
         });
         CurrentOrderVolumeC.addReference({referenceType: "OrganizedBy",nodeId: OrderMonitoring});
-
+        
         var CurrentAuftragfinished = addressSpace.addVariable({
             componentOf: Fabrik.getComponentByName("Header"),
             dataType: "Boolean",
@@ -522,6 +522,41 @@ function post_initialize() {
                 }
             }
         })*/
+        var CurrentOrderNumberOfProducts = addressSpace.addVariable({
+            componentOf: Fabrik.getComponentByName("Body"),
+            dataType: "String",
+            browseName:"ProductsNeededCurrentOrder",
+            value:{
+                get:function(){
+                    var currAuftrag = getCurrentAuftrag();
+                    if(currAuftrag === "NoCurrentAuftrag"){
+                        return new opcua.Variant({dataType:"String",value: "NoCurrentOrder"});
+                    }else{
+                        return new opcua.Variant({dataType:"String",value: addressSpace.findNode(currAuftrag).getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements().length.toString()});
+                    }
+                }
+            }
+        });
+        CurrentOrderNumberOfProducts.addReference({referenceType: "OrganizedBy",nodeId: CurrOrderMonitoring});
+
+        var CurrentOrderNumberFinishedProducts = addressSpace.addVariable({
+            componentOf: Fabrik.getComponentByName("Body"),
+            dataType: "String",
+            browseName: "ProductsFinishedCurrentOrder",
+            value:{
+                get: function(){
+                    var currAuftrag = getCurrentAuftrag();
+                    if(currAuftrag === "NoCurrentAuftrag"){
+                        return new opcua.Variant({dataType:"String",value: "NoCurrentOrder"});
+                    }else{
+                        var valueToReturn = addressSpace.findNode(currAuftrag).getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements().filter(e => e.getComponentByName("Body").getComponentByName("ProduktStatus").readValue().value.value === productstat.FINISHED).length;
+                        return new opcua.Variant({dataType:"String", value: valueToReturn.toString()});
+                    }
+                }
+            }
+        });
+        CurrentOrderNumberFinishedProducts.addReference({referenceType: "OrganizedBy",nodeId:CurrOrderMonitoring});
+
 //****** Methode zum Anlegen von Aufträgen */
 
         var createAuftrag = addressSpace.addMethod(Fabrik.getComponentByName("Body"), {
@@ -1123,9 +1158,10 @@ function post_initialize() {
                             if (response == null){
                                 //TODO: Throw some error
                             }
+                            var currCap = getCurrentCapability(produkt).browseName.toString();
                             var productionPossible = response.outputArguments[5].value;
                             //TODO: Remove this Output!
-                            console.log("Production of "+produkt.getComponentByName("Header").getComponentByName("Produktnummer").readValue().value.value+ " auf "+bestMachine.browseName.toString()+" possible: "+productionPossible);
+                            console.log(currCap+" of "+produkt.getComponentByName("Header").getComponentByName("Produktnummer").readValue().value.value+ " auf "+bestMachine.browseName.toString()+" possible: "+productionPossible);
                             //Wenn frei, dann platzieren der Produktion.
                             if(productionPossible){
                                 placeOrder(produkt,bestMachine, function(){
