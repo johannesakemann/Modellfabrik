@@ -1193,7 +1193,8 @@ function post_initialize() {
             var bestMachineforCap = availableMachinesforCap[0];
             var bestMachineProdTime = Number.MAX_VALUE;            
             availableMachinesforCap.forEach(function(machine){
-                var currMachineEndpoint = machine.getComponentByName("Header").getPropertyByName("Adresse").readValue().value.value;                    
+                var currMachineEndpoint = machine.getComponentByName("Header").getPropertyByName("Adresse").readValue().value.value;
+                console.log("Next Machine to request TtM: "+currMachineEndpoint);
                 var currMachineTime;
                 var requestsession;
                 var requestClient = new opcua.OPCUAClient();
