@@ -815,10 +815,16 @@ function post_initialize() {
         var Display_Anzeige = addressSpace.addVariable({
             browseName : "Anzeige",
             dataType : "String",
-            propertyOf: Display.getComponentByName("Body"),
+            componentOf: Display.getComponentByName("Body"),
             value:{
                 get: function(){
-                    return new opcua.Variant({dataType: "String", value:"SomeText"}); //Gedanken machen was man auf dem Display sehen soll 
+                    var produktArray = Assembler.getComponentByName("Body").getFolderElements().filter(e => e.browseName.toString() ==="Produkt");
+                    if (produktArray.length === 0){
+                        return new opcua.Variant({dataType: "String", value:"Aktuell kein Produkt in Bearbeitung"});
+                    }else{
+                        return new opcua.Variant({dataType: "String", value:"Aktuelles Produkt: "+produktArray[0].getComponentByName("Header").getComponentByName("Produktnummer").readValue().value.value});
+                    }
+                    
                 }
             }
         });
