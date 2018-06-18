@@ -26,7 +26,7 @@ var server = new opcua.OPCUAServer({
     }
 });
 
-var endpointFabrik = "opc.tcp://Johanness-MacBook-Pro-1434.local:4337/UA/modellfabrik";
+var endpointFabrik = "opc.tcp://MHraspberry:4337/UA/modellfabrik";
 var endpointMachine1 = server.endpoints[0].endpointDescriptions()[0].endpointUrl;
 
 function post_initialize() {
@@ -673,7 +673,7 @@ function post_initialize() {
                     ]
                 });
                 //Erhöhen der OutputB Variable
-                outputB++;
+                outputA++;
                 console.log("Production of ProductA "+produktNumber+ " is finished");
                 //Nach der Produktion Availability der Produktionscapability wieder auf true setzen
                 productionAvailability = true;

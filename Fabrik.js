@@ -90,7 +90,14 @@ function post_initialize() {
             componentOf: Monitoring
         });
 
+        var DeviceMonitoring = addressSpace.addObject({
+            browseName: "Device",
+            componentOf: Monitoring
+        })
+
 //****** OPCUA-Methode um Node Ids der aktuellen Auftragsdaten zurückzugeben */
+        //TODO: Löschen wenns passt 
+        /*
         var ProvideCurrOrderData = addressSpace.addMethod(Fabrik.getComponentByName("Body"),{
             modellingRule: "Mandatory",
             browseName: "ProvideCurrentOrderData",
@@ -127,7 +134,7 @@ function post_initialize() {
                     value: CurrentOrderVolumeC.nodeId.toString()
                 }]
             });
-        });
+        });*/
 //****** Anlegen Device Management Capability */
         var DeviceManagement = addressSpace.addObject({
             browseName: capabilities.DEVICEMANAGEMENT,
@@ -439,7 +446,7 @@ function post_initialize() {
             }
         });
 //****** Variablen zum Anzeigen aktueller Auftragsdaten */
-
+        /*
         var CurrentOrderNumber = addressSpace.addVariable({
             componentOf: Fabrik.getComponentByName("Body"),
             dataType: "String",
@@ -514,7 +521,7 @@ function post_initialize() {
                     return new opcua.Variant({dataType: "Boolean",value :auftragFinished});
                 }
             }
-        })
+        })*/
 //****** Methode zum Anlegen von Aufträgen */
 
         var createAuftrag = addressSpace.addMethod(Fabrik.getComponentByName("Body"), {
@@ -1106,7 +1113,7 @@ function post_initialize() {
                         return;
                     }
                     getBestMaschineCurrentCap(produkt,function(bestMachine){
-                        console.log(bestMachine);
+                        //console.log(bestMachine);
                         if(bestMachine === 0){
                             //TODO: Throw some error
                             return;
@@ -1195,7 +1202,7 @@ function post_initialize() {
             var bestMachineProdTime = Number.MAX_VALUE;            
             availableMachinesforCap.forEach(function(machine){
                 var currMachineEndpoint = machine.getComponentByName("Header").getPropertyByName("Adresse").readValue().value.value;
-                console.log("Next Machine to request TtM: "+currMachineEndpoint);
+                //console.log("Next Machine to request TtM: "+currMachineEndpoint);
                 var currMachineTime;
                 var requestsession;
                 var requestClient = new opcua.OPCUAClient();
@@ -1204,7 +1211,7 @@ function post_initialize() {
                     function(callback){
                         requestClient.connect(currMachineEndpoint,function(err){
                             if(!err){
-                                console.log("Connected to "+currMachineEndpoint+" in Order to request TimeToManufacture");
+                                //console.log("Connected to "+currMachineEndpoint+" in Order to request TimeToManufacture");
                                 callback();
                             }else{
                                 console.log(err);
@@ -1242,7 +1249,7 @@ function post_initialize() {
                             if(!err){
                                 currMachineTime = result.outputArguments[0].value;
                                 counterMachines++;
-                                console.log("Zeit von "+currMachineEndpoint+": "+currMachineTime);
+                                //console.log("Zeit von "+currMachineEndpoint+": "+currMachineTime);
                                 if (currMachineTime < bestMachineProdTime){
                                     bestMachineforCap = machine;
                                     bestMachineProdTime = currMachineTime;
@@ -1648,6 +1655,185 @@ function post_initialize() {
             var createdProduct = createProduct(currAuftrag,producttypes.C,[capabilities.PRODUCING,inputArguments[0].value]);
             callback();
         });
+
+//**** Methode zum Freigeben von Order Daten */
+
+        var ProvideOrderData = addressSpace.addMethod(Fabrik.getComponentByName("Body"),{
+            modellingRule: "Mandatory",
+            browseName: "ProvideOrderData",
+            inputArguments: [],
+            outputArguments: [
+                {
+                    dataType: "String",
+                    name: "OrderIds"
+                },
+                {
+                    dataType: "String",
+                    name: "OrderStatus"
+                },
+                {
+                    dataType: "String",
+                    name: "OrderAmountAs"
+                },
+                {
+                    dataType: "String",
+                    name: "OrderAmuntBs"
+                },
+                {
+                    dataType: "String",
+                    name: "OrderAmountCs"
+                }
+            ]
+        });
+        ProvideOrderData.bindMethod(function(inputArguments,context,callback){
+            callback({
+                statusCode: opcua.StatusCodes.Good,
+                outputArguments:[{
+                    dataType: "String",
+                    value: OrderIds.nodeId.toString()
+                },{
+                    dataType: "String",
+                    value: OrderStatus.nodeId.toString()
+                },{
+                    dataType: "String",
+                    value: OrderProductAs.nodeId.toString()
+                },{
+                    dataType: "String",
+                    value: OrderProductBs.nodeId.toString()
+                },{
+                    dataType: "String",
+                    value: OrderProductCs.nodeId.toString()
+                }]
+            })
+        })
+        ProvideOrderData.addReference({referenceType:"OrganizedBy",nodeId:OrderMonitoring});
+
+
+//**** Variablen die die Auftragsdaten storen */
+
+        var OrderIds = addressSpace.addVariable({
+            componentOf: Fabrik.getComponentByName("Body"),
+            browseName: "OrderIds",
+            arrayType: opcua.VariantArrayType.Array,
+            dataType: "Int32",
+            value:{
+                get: function(){
+                    var valueToReturn = Auftragsordner.getFolderElements().map(e => e.getComponentByName("Header").getComponentByName("Auftragsnummer").readValue().value.value);
+                    return new opcua.Variant({dataType: "Int32", arrayType: opcua.VariantArrayType.Array, value: valueToReturn});
+                }
+            }
+        });
+        OrderIds.addReference({referenceType:"OrganizedBy",nodeId:OrderMonitoring});
+
+        var OrderProductAs = addressSpace.addVariable({
+            browseName: "OrderProductsA",
+            componentOf: Fabrik.getComponentByName("Body"),
+            arrayType: opcua.VariantArrayType.Array,
+            dataType: "Int32",
+            value:{
+                get: function(){
+                    var valueToReturn = Auftragsordner.getFolderElements().map(e => e.getComponentByName("Body").getComponentByName("BestellmengeA").readValue().value.value);
+                    return new opcua.Variant({dataType: "Int32", arrayType: opcua.VariantArrayType.Array, value: valueToReturn});
+                }
+            }
+        });
+        OrderProductAs.addReference({referenceType:"OrganizedBy",nodeId:OrderMonitoring});
+        var OrderProductBs = addressSpace.addVariable({
+            browseName: "OrderProductsB",
+            componentOf: Fabrik.getComponentByName("Body"),
+            arrayType: opcua.VariantArrayType.Array,
+            dataType: "Int32",
+            value:{
+                get: function(){
+                    var valueToReturn = Auftragsordner.getFolderElements().map(e => e.getComponentByName("Body").getComponentByName("BestellmengeB").readValue().value.value);
+                    return new opcua.Variant({dataType: "Int32", arrayType: opcua.VariantArrayType.Array, value: valueToReturn});
+                }
+            }
+        });
+        OrderProductBs.addReference({referenceType:"OrganizedBy",nodeId:OrderMonitoring});
+        var OrderProductCs = addressSpace.addVariable({
+            browseName: "OrderProductsC",
+            componentOf: Fabrik.getComponentByName("Body"),
+            arrayType: opcua.VariantArrayType.Array,
+            dataType: "Int32",
+            value:{
+                get: function(){
+                    var valueToReturn = Auftragsordner.getFolderElements().map(e => e.getComponentByName("Body").getComponentByName("BestellmengeC").readValue().value.value);
+                    return new opcua.Variant({dataType: "Int32", arrayType: opcua.VariantArrayType.Array, value: valueToReturn});
+                }
+            }
+        });
+        OrderProductCs.addReference({referenceType:"OrganizedBy",nodeId:OrderMonitoring});
+        var OrderStatus = addressSpace.addVariable({
+            browseName: "OrderProductStatus",
+            componentOf: Fabrik.getComponentByName("Body"),
+            arrayType: opcua.VariantArrayType.Array,
+            dataType: "String",
+            value:{
+                get: function(){
+                    var valueToReturn = Auftragsordner.getFolderElements().map(e => e.getComponentByName("Header").getComponentByName("Auftragsstatus").readValue().value.value);
+                    return new opcua.Variant({dataType: "String", arrayType: opcua.VariantArrayType.Array, value: valueToReturn});
+                }
+            }
+        });
+        OrderStatus.addReference({referenceType:"OrganizedBy",nodeId:OrderMonitoring});
+        
+//**** Methode um Devices zu monitoren */
+        var ProvideDeviceData = addressSpace.addMethod(Fabrik.getComponentByName("Body"),{
+            modellingRule: "Mandatory",
+            browseName: "ProvideDeviceData",
+            inputArguments:[],
+            outputArguments:[{
+                dataType:"String",
+                name: "DeviceTyp"
+            },{
+                dataType: "String",
+                name: "DeviceIDs"
+            }]
+        })
+        ProvideDeviceData.addReference({referenceType: "OrganizedBy",nodeId: DeviceMonitoring});
+        ProvideDeviceData.bindMethod(function(inputArguments,context,callback){
+            callback({
+                statusCode: opcua.StatusCodes.Good,
+                outputArguments:[{
+                    dataType: "String",
+                    value: DeviceTypes.nodeId.toString()
+                },{
+                    dataType: "String",
+                    value: DeviceIds.nodeId.toString()
+                }]
+            })
+        });
+
+//***** Variablen um DeviceDaten Anzuzeigen */     
+        var DeviceTypes = addressSpace.addVariable({
+            browseName: "DeviceTypes",
+            componentOf: Fabrik.getComponentByName("Body"),
+            arrayType: opcua.VariantArrayType.Array,
+            dataType: "String",
+            value:{
+                get: function(){
+                    var valueToReturn = Geraeteordner.getFolderElements().map(e => e.getComponentByName("Header").getComponentByName("GeraeteTyp").readValue().value.value);
+                    return new opcua.Variant({dataType: "String", arrayType: opcua.VariantArrayType.Array, value: valueToReturn});
+                }
+            }
+        });
+        DeviceTypes.addReference({referenceType: "OrganizedBy",nodeId: DeviceMonitoring});
+
+        var DeviceIds = addressSpace.addVariable({
+            browseName: "DeviceIds",
+            componentOf: Fabrik.getComponentByName("Body"),
+            arrayType: opcua.VariantArrayType.Array,
+            dataType: "Int32",
+            value:{
+                get: function(){
+                    var valueToReturn = Geraeteordner.getFolderElements().map(e => e.getComponentByName("Header").getPropertyByName("SerialNumber").readValue().value.value);
+                    return new opcua.Variant({dataType: "Int32", arrayType: opcua.VariantArrayType.Array, value: valueToReturn});
+                }
+            }
+        });
+        DeviceIds.addReference({referenceType: "OrganizedBy",nodeId: DeviceMonitoring});
+
     }
 
 //****** Servererstellung */
