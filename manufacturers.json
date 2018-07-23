@@ -1,0 +1,9 @@
+{
+    "Machine": "RaspberryPiFoundation",
+    "LED": "LEDManufacturer",
+    "TemperatureSensor": "TemperatureSensorManufacturer",
+    "DistanceSensor": "DistanceSensorManufacturer",
+    "Display":"DisplayManufacturer",
+    "Fabrik": "AHA GmbH",
+    "Assembler": "Assemblermanufacturer"
+}

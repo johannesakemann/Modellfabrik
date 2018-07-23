@@ -1,0 +1,7 @@
+{
+    "MONITORING" : "Monitoring",
+    "PRODUCING"  : "Producing",
+    "SHOWING"    : "Showing",
+    "PROVIDEDATA": "ProvideData",
+    "COLLECTING": "Collecting"
+}

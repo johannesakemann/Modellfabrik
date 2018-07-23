@@ -1,0 +1,37 @@
+{
+    "Header": {
+            "REQUEST": "Request",
+            "ORDER": "Order"
+        },
+    "Type":{
+        "SHOWING":"Showing",
+        "MONITORING": "Monitoring",
+        "PRODUCING" :"Producing",
+        "COLLECTING": "Collecting"
+    },
+    "Content":{
+        "Showing": {
+            "LIGHT": "Light",
+            "TEXT": "Text"
+        },
+        "Monitoring":{
+            "TEMPERATURE": "Temperature",
+            "A":"ProduktA",
+            "B":"ProduktB",
+            "C":"ProduktC",
+            "PRODUCTION": "Production",
+            "ORDER":"Order"
+        },
+        "Producing":{
+            "A":"ProduktA",
+            "B":"ProduktB",
+            "C":"ProduktC"
+        },
+        "Collecting":{
+            "A": "ProduktA",
+            "B": "ProduktB",
+            "C": "ProduktC"
+        }
+    }
+
+}

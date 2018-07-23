@@ -1,0 +1,14 @@
+{
+    "Machine_1": "1",
+    "LED_1": "2",
+    "TemperatureSensor_1": "3",
+    "DistanceSensor_1": "4",
+    "Machine_2": "5",
+    "LED_2": "6",
+    "TemperatureSensor_2": "7",
+    "DistanceSensor_2": "8",
+    "Display": "9",
+    "Fabrik": "10",
+    "LED_A": "11",
+    "Assembler": "12"
+}
