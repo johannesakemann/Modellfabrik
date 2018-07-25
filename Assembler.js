@@ -6,7 +6,7 @@ var serialnumbers = require('./serialnumbers.json');
 var endpointtypes = require('./endpointtypes.json');
 var producttypes = require('./producttypes.json');
 var help = require('./help');
-var auftragsstat = require('./AuftragsStatus.json');
+var auftragsstat = require('./AuftragsStatus.json'); 
 var capabilities = require('./capabilities.json');
 var msgspec = require('./MessageSpecification.json');
 
