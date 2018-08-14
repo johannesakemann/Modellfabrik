@@ -362,7 +362,8 @@ function post_initialize() {
                     temperature_1 = parseFloat(variant.value);
                     return opcua.StatusCodes.Good;
                 }
-            }
+            },
+            eventSourceOf: TemperatureSensor
         });
         TemperatureSensorMesswerte.addReference({referenceType:"OrganizedBy",nodeId: TemperatureSensorTemperatur});
         var TemperatureSensorMesswerte_einheit = addressSpace.addVariable({
@@ -412,6 +413,24 @@ function post_initialize() {
                 }]
             });
         });
+
+//***** Feueralarm als Condition implementiert
+
+        var overheating = addressSpace.instantiateNonExclusiveLimitAlarm("NonExclusiveLimitAlarmType",{
+            nodeId: "ns=2;s=TemperaturSensorOverheating",
+            componentOf: TemperatureSensor,
+            browseName: "Overheating",
+            inputNode: TemperatureSensorMesswerte,
+            conditionSource: TemperatureSensorMesswerte,
+            optionals: [
+                "ConfirmedState", "Confirm" // confirm state and confirm Method
+            ],
+            lowLowLimit: -10.0,
+            lowLimit: 2.0,
+            highLimit: 26.0,
+            highHighLimit: 100.0
+        })
+                        
 //***** Instanzieren LED       
         var LED = AssetType.instantiate({
             browseName :"LED",
