@@ -47,6 +47,7 @@ function post_initialize() {
         var productionRunsB = false;
         var timeToManufactureA = 2;
         var timeToManufactureB = 10;
+        var overheatingTemperature = 26;
 ///**** Arrays festlegen
         var the_session, the_subscription;
         var productionOppAndTime1 = [2,0];
@@ -360,6 +361,13 @@ function post_initialize() {
                 },
                 set: function(variant){
                     temperature_1 = parseFloat(variant.value);
+                    if (temperature_1 > overheatingTemperature){
+                        SafeShutdown.execute([], new opcua.SessionContext(),function(err,result){
+                            if(err){
+                                console.log("Error calling Safe Shutdown: "+err);
+                            }
+                        })
+                    }
                     return opcua.StatusCodes.Good;
                 }
             },
@@ -423,14 +431,31 @@ function post_initialize() {
             inputNode: TemperatureSensorMesswerte,
             conditionSource: TemperatureSensorMesswerte,
             optionals: [
-                "ConfirmedState", "Confirm" // confirm state and confirm Method
+                "ConfirmedState" // confirm state and confirm Method
             ],
-            lowLowLimit: -10.0,
-            lowLimit: 2.0,
-            highLimit: 26.0,
-            highHighLimit: 100.0
+            //lowLowLimit: -10.0,
+            //lowLimit: 2.0,
+            highLimit: overheatingTemperature,
+            //highHighLimit: 100.0
         })
+//***** Safety Shutdown als OPCUA Methode
+        var SafeShutdown = addressSpace.addMethod(Machine_1.getComponentByName("Body"),{
+            modellingRule: "Mandatory",
+            nodeId:"ns=2;s=SafeShutdown",
+            browseName: "SafeShutdown",
+        });
                         
+        SafeShutdown.bindMethod(function(inputArgumens,context,callback){
+            productionRuns = false;
+            server.shutdown(1000,function(err){
+                if (!err){
+                    console.log("Maschine1 wird heruntergefahren");
+                }else{
+                    console.log("Error during shutdown: "+err);
+                }
+                //callback();
+            })
+        })
 //***** Instanzieren LED       
         var LED = AssetType.instantiate({
             browseName :"LED",
@@ -628,7 +653,7 @@ function post_initialize() {
                 outputA = productsA.length;
                 productsB = Machine_1.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements().filter(element =>element.getComponentByName("Header").getComponentByName("ProduktTyp").readValue().value.value===producttypes.B); 
                 outputB = productsB.length;
-                if(outputA>=volumeA){
+                if(outputA>=volumeA || !productionRuns){
                     productionRunsA = false;
                     clearInterval(productionA);
                     setTimeout(function(){
@@ -707,7 +732,7 @@ function post_initialize() {
                 outputA = productsA.length;
                 productsB = Machine_1.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements().filter(element =>element.getComponentByName("Header").getComponentByName("ProduktTyp").readValue().value.value===producttypes.B); 
                 outputB = productsB.length;
-                if (outputB >= volumeB){
+                if (outputB >= volumeB || !productionRuns){
                     productionRunsB = false;
                     setTimeout(function(){
                         sendProducts(endpointZiel,productsB,producttypes.B);
