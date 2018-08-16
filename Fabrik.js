@@ -125,6 +125,19 @@ function post_initialize() {
                 }]
             });
         });
+//****** Anlegen Device Management Capability */
+        var DeviceManagement = addressSpace.addObject({
+            browseName: capabilities.DEVICEMANAGEMENT,
+            organizedBy: Capabilities
+        });
+        var RegisterDeviceManagement = addressSpace.addObject({
+            browseName: msgspec.Content.DeviceManagement.REGISTER,
+            componentOf: DeviceManagement
+        });
+        var RemoveDeviceManagement = addressSpace.addObject({
+            browseName: msgspec.Content.DeviceManagement.REMOVE,
+            componentOf: DeviceManagement
+        })
 //****** Anlegen Collecting Capability */
         var Collecting = addressSpace.addObject({
             browseName: capabilities.COLLECTING,
