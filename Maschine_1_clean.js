@@ -866,6 +866,8 @@ function post_initialize() {
             var showing = Showing.getComponents().map(element => element.browseName.toString());
             var monitoring = Monitoring.getComponents().map(element => element.browseName.toString());
             var methodsession;
+            var registerMethodId;
+            var registerObjectId;
             async.series([
                 function(callback)  {
                     client.connect(endpointFabrik,function (err) {
@@ -921,13 +923,13 @@ function post_initialize() {
                             value: monitoring
                         }]
                     
-                    },function(err,result){
-                        if(!err){
-                            console.log("Method succesfully called");
-                            callback();
-                        }else{
-                            console.log(err);
+                    },function(err,response){
+                        //console.log(response);
+                        //console.log(err);
+                        if(err){
+                            console.log("Error during methodCall of register Method: "+err);
                         }
+                        callback(err);
                     });
                 },
                 function(callback){
