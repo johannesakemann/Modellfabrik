@@ -1230,8 +1230,7 @@ function post_initialize() {
                 }
                 Machine.addReference({referenceType: "OrganizedBy", nodeId: Capabilities.getFolderElements().filter(element => element.browseName.toString() === capabilities.MONITORING)[0].getComponentByName(cap)});
             });
-            var checkClient = new opcua.OPCUAClient({connectionStrategy:{maxRetry:2}});
-            checkEndpoint(endpoint.value,checkClient);
+
             callback();
         });
 
