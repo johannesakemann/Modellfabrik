@@ -1029,11 +1029,12 @@ function post_initialize() {
             });
         });
 
+
 //****** Methode zum Anlegen der von Geräten  */
 
         var createObject = addressSpace.addMethod(Fabrik.getComponentByName("Body"),{
             modellingRule:"Mandatory",
-            browseName: "CreateGeraet",
+            browseName: "registerDevice",
             inputArguments: [{
                 name: "Endpoint",
                 dataType: opcua.DataType.String
@@ -1066,7 +1067,7 @@ function post_initialize() {
 
         });
 
-        createObject.bindMethod(function(inputArguments,context,callback){
+        registerDevice.bindMethod(function(inputArguments,context,callback){
             var endpoint = inputArguments[0];
             var serialNumber = inputArguments[1];
             var manufacturer = inputArguments[2];
@@ -1233,6 +1234,8 @@ function post_initialize() {
             checkEndpoint(endpoint.value,checkClient);
             callback();
         });
+
+        registerDevice.addReference({referenceType: "OrganizedBy",nodeId: RegisterDeviceManagement});
 
 //****** JS-Hilfsfunktion zur Lokalisierung des aktuellen Auftrages, gibt dessen Node-Id zurück, wenn nicht erfolgt die Rückgabe: "NoCurrentAuftrag" */
         function getCurrentAuftrag(){
@@ -1485,137 +1488,85 @@ function post_initialize() {
                                     callback();
                                 });
                                 
-                            },
-                            function(callback){
-                                assemblersession.writeSingleNode("ns=2;s=Assembler-Header-OutputGoal",{dataType:opcua.DataType.Int32,value:gesamtmenge},function(err,statusCode){
-                                    if(!err){
-                                        console.log("Outputgoal Assembler Write Successfull!");
-                                        callback();
-                                    }else{
-                                        console.log(err);
-                                    }
-                                });
-                            },
-                            function(callback){
-                                assemblersession.writeSingleNode("ns=2;s=Assembler-Header-MengeAproC",{dataType:opcua.DataType.Int32,value:AProC},function(err,statusCode){
-                                    if(!err){
-                                        console.log("AProC Assembler Write Successfull!");
-                                        callback();
-                                    }else{
-                                        console.log(err);
-                                    }
-                                });
-                            },
-                            function(callback){
-                                assemblersession.writeSingleNode("ns=2;s=Assembler-Header-MengeBproC",{dataType:opcua.DataType.Int32,value:BProC},function(err,statusCode){
-                                    if(!err){
-                                        console.log("BProC Assembler Write Successfull!");
-                                        callback();
-                                    }else{
-                                        console.log(err);
-                                    }
-                                });
-                            },
-                            function(callback){
-                                assemblersession.close();
-                                client.disconnect(function(err){
-                                    if(!err){
-                                        callback();
-                                        cb();
-                                    }
+//****** OPCUA-Methode die von ausssen aufgerufen wird wenn Gerät entfernt wird, nimmt die Goals und CurrentOutputs aller Produkte, sowie den Endpoint des Geräts
 
+        var removeDevice = addressSpace.addMethod(Fabrik.getComponentByName("Body"),{
+            browseName: "removeDevice",
+            modellingRule: "Mandatory",
+            inputArguments:[
+                {
+                    name: "OutputgoalA",
+                    dataType: "Int32",
+                                    },{
+                    name: "OutputA",
+                    dataType: "Int32"
+                                    },{
+                    name: "OutputgoalB",
+                    dataType: "Int32",
+                                    },{
+                    name: "OutputB",
+                    dataType: "Int32"
+                                    },{
+                    name: "OutputgoalC",
+                    dataType: "Int32",
+                                    },{
+                    name: "OutputC",
+                    dataType: "Int32"
+                                    },{
+                    name: "EndpointToRemove",
+                    dataType: "String"
+                }
+            ],
+            outputArguments:[]
                                 });
-                            }
-                        ])
-                    });
-                },
-                function(cb){                              
-                    var index = 0;
-                    console.log(bestSolution);
-                    console.log("Production Possibility Chosen: "+(bestSolution[index]+1));
-                    addressenMaschinen.forEach(function(addresse){
-                        var maschinensession;
-                        async.series([
-                            function(callback){
-                                client.connect(addresse,function(err){
-                                    if(!err){
-                                        console.log("Connected to Maschine: "+addresse);
-                                        callback();        
-                                    }else{
-                                        console.log(err);
+
+        removeDevice.bindMethod(function(inputArguments,context,outputArguments){
+            var deviceGoalA = inputArguments[0].readValue().value.value;
+            var deviceOuputA = inputArguments[1].readValue().value.value;
+            var deviceGoalB = inputArguments[2].readValue().value.value;
+            var deviceOuputB = inputArguments[3].readValue().value.value;
+            var deviceGoalC = inputArguments[4].readValue().value.value;
+            var deviceOuputC = inputArguments[5].readValue().value.value;
+            var endpointToDelete = inputArguments[6].readValue().value.value;
+
+            //Löschen des OPCUA-Objects
+            var nodeToBeDeleted = Geraeteordner.getFolderElements().filter(element => endpointToDelete === element.getComponentByName("Header").getPropertyByName("Adresse").readValue().value.value)[0];
+            addressSpace.deleteNode(nodeToBeDeleted);
+            //Capabilities entfernen
+            removeCapabilities();
+            //Check ob die Production auf dem Gerät abgeschlossen ist
+            var deviceProductionfinished = ((deviceOutputA >= deviceGoalA) && (deviceOutputlB >= deviceGoalB) && (deviceOutputC >= deviceGoalC));
+            if(deviceProductionfinished){
+
+            }else{
+                //Check ob der Aktuelle Auftrag noch bearbeitet werden kann
+                if(checkCapabilitesCurrentOrderMatch()){
+                    var additionalA = Math.min(0, deviceGoalA-deviceOutputA);
+                    var additionalB = Math.min(0, deviceGoalB-deviceOutputB);
+                    var additionalC = Math.min(0, deviceGoalC-deviceOutputC);
+                    //Hinzufügen der liegengelassenen Produkte auf die verbleibenden Geräte durch erneutes Aufrufen der startProductionFunktion
+                    var additionalAVariant = new opcua.Variant({dataType: "Int32",value: additionalA});
+                    var additionalBVariant = new opcua.Variant({dataType: "Int32",value: additionalB});
+                    var additionalCVariant = new opcua.Variant({dataType: "Int32",value: additionalC});
+                    startProduction.execute([additionalAVariant,additionalBVariant,additionalCVariant],new opcua.SessionContext(),function(err,result){
+                        if(err){
+                            console.log("Error during restarting Production with additional Productquantities: "+err);
                                     }
-                                });
-                            },
-                            function(callback){
-                                client.createSession(function(err,session){
-                                    if(!err){
-                                        maschinensession = session;
-                                        callback();
-                                    }else{
-                                        console.log(err);
-                                    }
-                                })
-                                
-                            },
-                            function(callback){
-                                var id = "ns=2;s=RunProductionPossibility"+(bestSolution[index]+1);
-                                console.log(id);
-                                maschinensession.call({
-                                    objectId: "ns=2;s=Machine-Body",
-                                    methodId: id,
-                                    inputArguments:[{
-                                        name: "VolumeA",
-                                        dataType: opcua.DataType.Int32,
-                                        value: mengenverteilung[index][0]
-                                    },{
-                                        name: "VolumeB",
-                                        dataType: opcua.DataType.Int32,
-                                        value: mengenverteilung[index][1]
-                                    },{
-                                        name:"EndpointAssembler",
-                                        dataType: opcua.DataType.String,
-                                        value: addressenAssembler[0]
-                                    },{
-                                        name: "Auftraggeber",
-                                        dataType: opcua.DataType.String,
-                                        value: addressSpace.findNode(getCurrentAuftrag()).getComponentByName("Header").getComponentByName("Auftraggeber").readValue().value.value
-                                    },{
-                                        name: "Autragsnummer",
-                                        dataType: opcua.DataType.Int32,
-                                        value: addressSpace.findNode(getCurrentAuftrag()).getComponentByName("Header").getComponentByName("Auftragsnummer").readValue().value.value
-                                    },{
-                                        name: "Bestellmenge",
-                                        dataType: opcua.DataType.Int32,
-                                        value: addressSpace.findNode(getCurrentAuftrag()).getComponentByName("Body").getComponentByName("Bestellmenge").readValue().value.value
-                                    },{
-                                        name: "MengeAProC",
-                                        dataType: opcua.DataType.Int32,
-                                        value: addressSpace.findNode(getCurrentAuftrag()).getComponentByName("Body").getComponentByName("AnzahlA").readValue().value.value
-                                    },{
-                                        name: "MengeBProC",
-                                        dataType: opcua.DataType.Int32,
-                                        value: addressSpace.findNode(getCurrentAuftrag()).getComponentByName("Body").getComponentByName("AnzahlB").readValue().value.value
-                                    }]
-                                },function(err,response){
-                                    callback();
-                                });
-                            },
-                            function(callback){
-                                maschinensession.close();
-                                client.disconnect(function(err){
-                                    if(!err){
-                                        index++;
-                                        callback();
-                                        cb();
-                                    }
-                                });
+                    })
+                }else{
+
                             }
                         ]);
                     });
                 }
-            ]);*/
-            cb();
-        });
+
+
+        })
+        removeDevice.addReference({referenceType:"OrganizedBy",nodeId:RemoveDeviceManagement})
+
+
+
+//****** JS-Funktion um zu checken ob aktueller Auftrag bewältigbar ist, returns boolean
 
 //****** JS-Funktion um Geraeteverbindungen zu checken */
         function checkEndpoint(endpoint,checkClient){

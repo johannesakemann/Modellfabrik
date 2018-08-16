@@ -3,5 +3,6 @@
     "PRODUCING"  : "Producing",
     "SHOWING"    : "Showing",
     "PROVIDEDATA": "ProvideData",
-    "COLLECTING": "Collecting"
+    "COLLECTING": "Collecting",
+    "DEVICEMANAGEMENT": "DeviceManagement"
 }
