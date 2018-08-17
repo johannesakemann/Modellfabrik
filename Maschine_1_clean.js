@@ -543,7 +543,7 @@ function post_initialize() {
                 }
             ]);
             //Herunterfahren des Servers.
-            server.shutdown(1000,function(err){
+            server.shutdown(10000,function(err){
                 if (!err){
                     console.log("Maschine1 wird heruntergefahren");
                 }else{
@@ -723,7 +723,6 @@ function post_initialize() {
         ProduceProductA.addReference({referenceType: "OrganizedBy",nodeId: ProduktA});
 
         ProduceProductA.bindMethod(function(inputArguments,context,callback){
-            console.log("Production Product A started");
             productionRuns = true;
             var auftraggeber = inputArguments[2].value;
             var auftragsnummer = inputArguments[3].value;
@@ -754,12 +753,11 @@ function post_initialize() {
                 productsB = Machine_1.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements().filter(element =>element.getComponentByName("Header").getComponentByName("ProduktTyp").readValue().value.value===producttypes.B); 
                 outputB = productsB.length;
                 if(outputA>=volumeA || !productionRuns){
+                    console.log("Produktionsabbruch!")
                     productionRunsA = false;
                     clearInterval(productionA);
-                    setTimeout(function(){
                         sendProducts(endpointZiel,productsA,producttypes.A);
                         outputgoalA = 0;
-                    },10000);
                     if(outputB>=outputgoalB){
                         productionRuns = false;
                     }
@@ -806,7 +804,6 @@ function post_initialize() {
         ProduceProductB.addReference({referenceType: "OrganizedBy",nodeId: ProduktB});
 
         ProduceProductB.bindMethod(function(inputArguments,context,callback){
-            console.log("Production Product B started");
             productionRuns = true;
             var auftraggeber = inputArguments[2].value;
             var auftragsnummer = inputArguments[3].value;
@@ -836,12 +833,10 @@ function post_initialize() {
                 productsB = Machine_1.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements().filter(element =>element.getComponentByName("Header").getComponentByName("ProduktTyp").readValue().value.value===producttypes.B); 
                 outputB = productsB.length;
                 if (outputB >= volumeB || !productionRuns){
+                    clearInterval(productionB);
                     productionRunsB = false;
-                    setTimeout(function(){
                         sendProducts(endpointZiel,productsB,producttypes.B);
                         outputgoalB = 0;
-                    },10000);
-                    clearInterval(productionB);
                     if(outputA>= outputgoalA){
                         productionRuns = false;
                     }
@@ -1214,7 +1209,8 @@ function post_initialize() {
                     products.forEach(function(product){
                         addressSpace.deleteNode(product);
                     });
-                    if (Machine_1.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements().length === 0){
+                    //Löschen des Auftrages wenn die Produktion für diesen abgeschlossen ist.
+                    if (!productionRuns){
                         addressSpace.deleteNode(Machine_1.getComponentByName("Body").getComponentByName("CurrentAuftrag"));
                     }
                     callback();

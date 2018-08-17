@@ -440,13 +440,10 @@ function post_initialize() {
                                     },
                                     function(callback){
                                         var currAuftragBody = addressSpace.findNode(getCurrentAuftrag()).getComponentByName("Body");
-                                        var mengeA = currAuftragBody.getComponentByName("BerechneteMengeA");
-                                        var mengeB = currAuftragBody.getComponentByName("BerechneteMengeB");
-                                        var mengeC = currAuftragBody.getComponentByName("BerechneteMengeC");
-                                        var mengeAVariant = new opcua.Variant({dataType: "Int32",value: mengeA});
-                                        var mengeBVariant = new opcua.Variant({dataType: "Int32",value: mengeB});
-                                        var mengeCVariant = new opcua.Variant({dataType: "Int32",value: mengeC});
-                                        startProduction.execute([mengeAVariant,mengeBVariant,mengeCVariant],new opcua.SessionContext(),function(err,result){
+                                        var mengeA = currAuftragBody.getComponentByName("BerechneteMengeA").readValue().value;
+                                        var mengeB = currAuftragBody.getComponentByName("BerechneteMengeB").readValue().value;
+                                        var mengeC = currAuftragBody.getComponentByName("BerechneteMengeC").readValue().value;                                    
+                                        startProduction.execute([mengeA,mengeB,mengeC],new opcua.SessionContext(),function(err,result){
                                             if(!err){
                                                 console.log("Starte Produktion!!!");
                                             }
@@ -1329,9 +1326,9 @@ function post_initialize() {
         })
         startProduction.bindMethod(function(inputArguments,context,cb){
             var auftrag = addressSpace.findNode(getCurrentAuftrag());
-            var mengeA = inputArguments[0].readValue().value.value;
-            var mengeB = inputArguments[1].readValue().value.value;
-            var mengeC = inputArguments[2].readValue().value.value;
+            var mengeA = inputArguments[0].value;
+            var mengeB = inputArguments[1].value;
+            var mengeC = inputArguments[2].value;
             var prodData = {}
             var producing = Capabilities.getFolderElements().filter(e => e.browseName.toString() === msgspec.Type.PRODUCING)[0];
             var mengenObj = {};
@@ -1539,7 +1536,7 @@ function post_initialize() {
             outputArguments:[]
         });
 
-        removeDevice.bindMethod(function(inputArguments,context,outputArguments){
+        removeDevice.bindMethod(function(inputArguments,context,callback){
             var deviceGoalA = inputArguments[0].value;
             var deviceOutputA = inputArguments[1].value;
             var deviceGoalB = inputArguments[2].value;
@@ -1560,9 +1557,9 @@ function post_initialize() {
             }else{
                 //Check ob der Aktuelle Auftrag noch bearbeitet werden kann
                 if(checkCapabilitesCurrentOrderMatch()){
-                    var additionalA = Math.min(0, deviceGoalA-deviceOutputA);
-                    var additionalB = Math.min(0, deviceGoalB-deviceOutputB);
-                    var additionalC = Math.min(0, deviceGoalC-deviceOutputC);
+                    var additionalA = Math.max(0, deviceGoalA-deviceOutputA);
+                    var additionalB = Math.max(0, deviceGoalB-deviceOutputB);
+                    var additionalC = Math.max(0, deviceGoalC-deviceOutputC);
                     //Hinzufügen der liegengelassenen Produkte auf die verbleibenden Geräte durch erneutes Aufrufen der startProductionFunktion
                     var additionalAVariant = new opcua.Variant({dataType: "Int32",value: additionalA});
                     var additionalBVariant = new opcua.Variant({dataType: "Int32",value: additionalB});
@@ -1576,6 +1573,9 @@ function post_initialize() {
 
                 }
             }
+            //callback an den Client senden
+            callback();
+            //kurze Ausgabe
             console.log(endpointToDelete+" wurde entfernt");
 
 

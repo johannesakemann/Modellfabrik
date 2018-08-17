@@ -45,8 +45,8 @@ function post_initialize() {
         var productionRuns = false;
         var productionRunsA = false;
         var productionRunsB = false;
-        var timeToManufactureA = 2;
-        var timeToManufactureB = 10;
+        var timeToManufactureA = 10;
+        var timeToManufactureB = 2;
         var overheatingTemperature = 26;
 ///**** Arrays festlegen
         var the_session, the_subscription;
@@ -543,9 +543,9 @@ function post_initialize() {
                 }
             ]);
             //Herunterfahren des Servers.
-            server.shutdown(1000,function(err){
+            server.shutdown(10000,function(err){
                 if (!err){
-                    console.log("Maschine1 wird heruntergefahren");
+                    console.log("Maschine2 wird heruntergefahren");
                 }else{
                     console.log("Error during shutdown: "+err);
                 }
@@ -723,7 +723,6 @@ function post_initialize() {
         ProduceProductA.addReference({referenceType: "OrganizedBy",nodeId: ProduktA});
 
         ProduceProductA.bindMethod(function(inputArguments,context,callback){
-            console.log("Production Product A started");
             productionRuns = true;
             var auftraggeber = inputArguments[2].value;
             var auftragsnummer = inputArguments[3].value;
@@ -756,10 +755,8 @@ function post_initialize() {
                 if(outputA>=volumeA || !productionRuns){
                     productionRunsA = false;
                     clearInterval(productionA);
-                    setTimeout(function(){
                         sendProducts(endpointZiel,productsA,producttypes.A);
                         outputgoalA = 0;
-                    },10000);
                     if(outputB>=outputgoalB){
                         productionRuns = false;
                     }
@@ -806,7 +803,6 @@ function post_initialize() {
         ProduceProductB.addReference({referenceType: "OrganizedBy",nodeId: ProduktB});
 
         ProduceProductB.bindMethod(function(inputArguments,context,callback){
-            console.log("Production Product B started");
             productionRuns = true;
             var auftraggeber = inputArguments[2].value;
             var auftragsnummer = inputArguments[3].value;
@@ -837,11 +833,9 @@ function post_initialize() {
                 outputB = productsB.length;
                 if (outputB >= volumeB || !productionRuns){
                     productionRunsB = false;
-                    setTimeout(function(){
+                    clearInterval(productionB);                    
                         sendProducts(endpointZiel,productsB,producttypes.B);
                         outputgoalB = 0;
-                    },10000);
-                    clearInterval(productionB);
                     if(outputA>= outputgoalA){
                         productionRuns = false;
                     }
@@ -1214,7 +1208,7 @@ function post_initialize() {
                     products.forEach(function(product){
                         addressSpace.deleteNode(product);
                     });
-                    if (Machine_2.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements().length === 0){
+                    if (!productionRuns){
                         addressSpace.deleteNode(Machine_2.getComponentByName("Body").getComponentByName("CurrentAuftrag"));
                     }
                     callback();
