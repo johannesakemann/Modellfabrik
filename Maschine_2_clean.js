@@ -13,12 +13,10 @@ var capabilities = require('./capabilities.json');
 var msgspec = require('./MessageSpecification.json');
 
 var client =  new opcua.OPCUAClient({endpoint_must_exist:false});
-
-
 var server = new opcua.OPCUAServer({
-    port: 4336, // the port of the listening socket of the server
+    port: 4334, // the port of the listening socket of the server
     maxAllowedSessionNumber: 100,
-    resourcePath: "UA/machine_2", // this path will be added to the endpoint resource name
+    resourcePath: "UA/Machine_2", // this path will be added to the endpoint resource name
     nodeset_filename: [opcua.standard_nodeset_file], //"/home/pi/modellfabrik/aas_for_import.xml"],
      buildInfo : {
         productName: "Machine_2",
@@ -27,8 +25,8 @@ var server = new opcua.OPCUAServer({
     }
 });
 
-var endpointFabrik = "opc.tcp://Johanness-MacBook-Pro-693.local:4337/UA/modellfabrik";
-var endpointMachine1 = server.endpoints[0].endpointDescriptions()[0].endpointUrl;
+var endpointFabrik = "opc.tcp://Johanness-MacBook-Pro-1057.local:4337/UA/modellfabrik";
+var endpointMachine2 = server.endpoints[0].endpointDescriptions()[0].endpointUrl;
 
 function post_initialize() {
     console.log("initialized");
@@ -47,13 +45,14 @@ function post_initialize() {
         var productionRuns = false;
         var productionRunsA = false;
         var productionRunsB = false;
-        var timeToManufactureA = 10;
-        var timeToManufactureB = 2;
+        var timeToManufactureA = 2;
+        var timeToManufactureB = 10;
+        var overheatingTemperature = 26;
 ///**** Arrays festlegen
         var the_session, the_subscription;
-        var productionOppAndTime1 = [2,0];
+        var productionOppAndTime1 = [0,2];
         var productionOppAndTime2 = [8,5];
-        var productionOppAndTime3 = [0,4];
+        var productionOppAndTime3 = [4,0];
                 
         var runProductionOppAndTime1 = false;
         var runProductionOppAndTime2 = false;
@@ -91,19 +90,19 @@ function post_initialize() {
             propertyOf : Header
         });
       
-//***** Instanzieren konkreter Objekte -- Machine 1
+//***** Instanzieren konkreter Objekte -- Machine2
               
-        var Machine_1 = AssetType.instantiate({
+        var Machine_2 = AssetType.instantiate({
             browseName :"Machine_2",
             nodeId:"ns=2;s=Machine",
             organizedBy: objectFolder
         });
 
-        var Header_Machine_1 = Machine_1.getComponentByName("Header");
+        var Header_Machine_2 = Machine_2.getComponentByName("Header");
 
-        var Machine_1_manufacturer = addressSpace.addVariable({
+        var Machine_2_manufacturer = addressSpace.addVariable({
             browseName: "Manufacturer",
-            propertyOf: Header_Machine_1,
+            propertyOf: Header_Machine_2,
             dataType: "String",
             value:{
                 get: function(){
@@ -112,9 +111,9 @@ function post_initialize() {
             }
         });
 
-        var Machine_1_serialnumber = addressSpace.addVariable({
+        var Machine_2_serialnumber = addressSpace.addVariable({
             browseName: "SerialNumber",
-            propertyOf: Header_Machine_1,
+            propertyOf: Header_Machine_2,
             dataType: "String",
             value:{
                 get: function(){
@@ -125,7 +124,7 @@ function post_initialize() {
 //***** Spezifizieren Manifest
         var Manifest = addressSpace.addObject({
             browseName: "Manifest",
-            componentOf: Machine_1,
+            componentOf: Machine_2,
             nodeId: "ns=2;s=Manifest"
         });
 
@@ -134,7 +133,7 @@ function post_initialize() {
             componentOf: Manifest,
             typeDefinition: folderType
         });
-        Machine_1_serialnumber.addReference({referenceType:"OrganizedBy",nodeId: Identification});
+        Machine_2_serialnumber.addReference({referenceType:"OrganizedBy",nodeId: Identification});
 
         var Capabilities = addressSpace.addObject({
             browseName: "Capabilities",
@@ -240,16 +239,17 @@ function post_initialize() {
             browseName: "Production",
             componentOf: Monitoring
         });
+
 //***** Spezifikation der Showing Capability
         var Light = addressSpace.addObject({
             browseName:"Light",
             componentOf:Showing
         });    
-//***** Machine2 -- Production Runs*/
+//***** Machine1 -- Production Runs*/
         var ProductionRuns = addressSpace.addVariable({
             browseName: "ProductionRuns",
             dataType: "Boolean",
-            propertyOf: Machine_1.getComponentByName("Body"),
+            propertyOf: Machine_2.getComponentByName("Body"),
             value:{
                 get: function(){
                     return new opcua.Variant({dataType: "Boolean", value:productionRuns});
@@ -261,11 +261,11 @@ function post_initialize() {
             }
         });
         ProductionRuns.addReference({referenceType: "OrganizedBy",nodeId: Produktion});
-//***** Machine2 --- Outputgoals */
+//***** Machine1 --- Outputgoals */
         var OutputgoalA = addressSpace.addVariable({
             browseName: "OutputGoalProductA",
             dataType: "Int32",
-            propertyOf: Machine_1.getComponentByName("Body"),
+            propertyOf: Machine_2.getComponentByName("Body"),
             value:{
                 get: function(){
                     return new opcua.Variant({dataType: "Int32", value:outputgoalA});
@@ -280,7 +280,7 @@ function post_initialize() {
         var OutputgoalB = addressSpace.addVariable({
             browseName: "OutputGoalProductB",
             dataType: "Int32",
-            propertyOf: Machine_1.getComponentByName("Body"),
+            propertyOf: Machine_2.getComponentByName("Body"),
             value:{
                 get: function(){
                     return new opcua.Variant({dataType: "Int32", value:outputgoalB});
@@ -292,11 +292,10 @@ function post_initialize() {
         });
         OutputgoalB.addReference({referenceType: "OrganizedBy",nodeId: ProduktBMonitoring});
 
-
-//***** Instanzieren Temperatursensor
+//***** Instanzieren Temperatursensor       
         var TemperatureSensor = AssetType.instantiate({
             browseName :"TemperatureSensor",
-            organizedBy: Machine_1.getComponentByName("Body") 
+            organizedBy: Machine_2.getComponentByName("Body") 
         });
 
         TemperatureSensor.addReference({referenceType: "OrganizedBy",nodeId:Temperatur});
@@ -323,7 +322,7 @@ function post_initialize() {
             dataType: "String",
             value:{
                 get: function(){
-                    return new opcua.Variant({dataType: opcua.DataType.String,value: serialnumbers["TemperatureSensor_2"]});
+                    return new opcua.Variant({dataType: opcua.DataType.String,value: serialnumbers["TemperatureSensor_1"]});
                 }
             }
         });
@@ -351,7 +350,6 @@ function post_initialize() {
             browseName: "Temperature",
             componentOf: MonitoringTemperatureSensor
         });
-
 //***** Temperatursensor Messwerte */
         var TemperatureSensorMesswerte = addressSpace.addVariable({
             browseName : "Messwert",
@@ -363,11 +361,19 @@ function post_initialize() {
                 },
                 set: function(variant){
                     temperature_1 = parseFloat(variant.value);
+                    if (temperature_1 > overheatingTemperature){
+                        SafeShutdown.execute([], new opcua.SessionContext(),function(err,result){
+                            if(err){
+                                console.log("Error calling Safe Shutdown: "+err);
+                            }
+                        })
+                    }
                     return opcua.StatusCodes.Good;
                 }
-            }
+            },
+            eventSourceOf: TemperatureSensor
         });
-        TemperatureSensorMesswerte.addReference({referenceType: "OrganizedBy", nodeId: TemperatureSensorTemperatur});
+        TemperatureSensorMesswerte.addReference({referenceType:"OrganizedBy",nodeId: TemperatureSensorTemperatur});
         var TemperatureSensorMesswerte_einheit = addressSpace.addVariable({
             browseName: "Einheit",
             dataType: "String",
@@ -386,7 +392,8 @@ function post_initialize() {
                 get: function() {return help.calculate_normalized_value(temperature_1,20,25);}
             }
         });
-        TemperatureMesswerte_skala.addReference({referenceType: "OrganizedBy", nodeId: TemperatureSensorTemperatur});
+        TemperatureMesswerte_skala.addReference({referenceType:"OrganizedBy",nodeId: TemperatureSensorTemperatur});
+
         var ProvideTemperatureData = addressSpace.addMethod(TemperatureSensorBody,{
             browseName: "ProvideTemperatureData",
             nodeId: "ns=2;s=ProvideTemperatureData",
@@ -414,10 +421,141 @@ function post_initialize() {
                 }]
             });
         });
+
+//***** Feueralarm als Condition implementiert
+
+        var overheating = addressSpace.instantiateNonExclusiveLimitAlarm("NonExclusiveLimitAlarmType",{
+            nodeId: "ns=2;s=TemperaturSensorOverheating",
+            componentOf: TemperatureSensor,
+            browseName: "Overheating",
+            inputNode: TemperatureSensorMesswerte,
+            conditionSource: TemperatureSensorMesswerte,
+            optionals: [
+                "ConfirmedState" // confirm state and confirm Method
+            ],
+            //lowLowLimit: -10.0,
+            //lowLimit: 2.0,
+            highLimit: overheatingTemperature,
+            //highHighLimit: 100.0
+        })
+//***** Safety Shutdown als OPCUA Methode
+        var SafeShutdown = addressSpace.addMethod(Machine_2.getComponentByName("Body"),{
+            modellingRule: "Mandatory",
+            nodeId:"ns=2;s=SafeShutdown",
+            browseName: "SafeShutdown",
+        });
+
+        SafeShutdown.bindMethod(function(inputArgumens,context,callback){
+            //Zunächst beenden der Produktion --> führt auch zum senden der Produkte an die nächste Instanz
+            productionRuns = false;
+            //Aufrufen der remove Methode in der Fabrik --> entfernen des Devices + letzter Status der übergeben wird.
+            var unregistersession;
+            var unregisterMethodId;
+            var unregisterObjectId;
+            async.series([
+                function(callback)  {
+                    client.connect(endpointFabrik,function (err) {
+                        if(err) {
+                            console.log(" cannot connect to endpoint :" , endpointFabrik );
+                            console.log(err);
+                        }
+                        callback(err);
+                    }); 
+                },
+                function(callback) {
+                    client.createSession(function(err,session) {
+                        if(!err) {
+                            unregistersession = session;
+                        }
+                        callback(err);
+                    });
+                },
+                function(callback){
+                    unregistersession.call({
+                        objectId: "ns=2;s=Manifest",
+                        methodId: "ns=2;s=ManifestPort",
+                        inputArguments:[
+                            {
+                                dataType: "String",
+                                value: msgspec.Header.ORDER
+                            },{
+                                dataType: "String",
+                                value: msgspec.Type.DEVICEMANAGEMENT
+                            },{
+                                dataType: "String",
+                                value: msgspec.Content.DeviceManagement.REMOVE
+                            }
+                        ]
+                    },function(err,response){
+                        if (err){
+                            console.log("Error during Unregister request: "+err);
+                        }else{
+                            //console.log(response);
+                            unregisterMethodId = response.outputArguments[3].value;
+                            unregisterObjectId = response.outputArguments[4].value;
+                            //console.log(unregisterMethodId);
+                            //console.log(unregisterObjectId);
+                            callback();
+                        }
+                    })
+                },
+                function(callback){
+                    unregistersession.call({
+                        objectId:unregisterObjectId,
+                        methodId:unregisterMethodId,
+                        inputArguments:[
+                            {
+                                dataType: "Int32",
+                                value:outputgoalA
+                            },{
+                                dataType: "Int32",
+                                value: OutputA.readValue().value.value
+                            },{
+                                dataType: "Int32",
+                                value: outputgoalB
+                            },{
+                                dataType: "Int32",
+                                value: OutputB.readValue().value.value
+                            },{
+                                dataType: "Int32",
+                                value: 0
+                            },{
+                                dataType: "Int32",
+                                value: 0
+                            },{
+                                dataType: "String",
+                                value: endpointMachine1
+                            }
+                        ]
+                    },function(err,response){
+                        if (err){
+                            console.log("Error during removal of device: "+err);
+                        }else{
+                            console.log("Device sucessfully removed");
+                        }
+                        callback();
+                    })
+                },
+                function(callback){
+                    unregistersession.close();
+                    client.disconnect();
+                    callback();
+                }
+            ]);
+            //Herunterfahren des Servers.
+            server.shutdown(1000,function(err){
+                if (!err){
+                    console.log("Maschine1 wird heruntergefahren");
+                }else{
+                    console.log("Error during shutdown: "+err);
+                }
+                //callback();
+            })
+        })
 //***** Instanzieren LED       
         var LED = AssetType.instantiate({
             browseName :"LED",
-            organizedBy: Machine_1.getComponentByName("Body") 
+            organizedBy: Machine_2.getComponentByName("Body") 
         });
 
         LED.addReference({referenceType: "OrganizedBy",nodeId: Light});
@@ -489,9 +627,9 @@ function post_initialize() {
         });
         LED_power.addReference({referenceType: "OrganizedBy",nodeId: LEDLight});
 //***** Anlegen Endpointtype
-        var Machine_1_endpointtype = addressSpace.addVariable({
+        var Machine_2_endpointtype = addressSpace.addVariable({
             browseName: "EndpointType",
-            propertyOf: Header_Machine_1,
+            propertyOf: Header_Machine_2,
             dataType: "String",
             value:{
                 get: function(){
@@ -503,7 +641,7 @@ function post_initialize() {
         var Addresse = addressSpace.addVariable({
             browseName: "Addresse",
             dataType: "String",
-            componentOf: Machine_1.getComponentByName("Header"),
+            componentOf: Machine_2.getComponentByName("Header"),
             value: {
                 get: function(){
                     return new opcua.Variant({dataType: "String", value: endpointMachine1});
@@ -516,11 +654,11 @@ function post_initialize() {
             browseName: "OutputA",
             description:"Anzahl vorhandener Produkte des Typs A im Produktordner",
             dataType: "Int32",
-            propertyOf: Machine_1.getComponentByName("Body"),
+            propertyOf: Machine_2.getComponentByName("Body"),
             value:{
                 get: function(){
                     try{
-                        return new opcua.Variant({dataType: "Int32", value:Machine_1.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements().filter(produkt => produkt.getComponentByName("Header").getComponentByName("ProduktTyp").readValue().value.value === producttypes.A).length});        
+                        return new opcua.Variant({dataType: "Int32", value:Machine_2.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements().filter(produkt => produkt.getComponentByName("Header").getComponentByName("ProduktTyp").readValue().value.value === producttypes.A).length});        
                     }catch(err){
                         return new opcua.Variant({dataType: "Int32", value:0});
                     }
@@ -529,16 +667,17 @@ function post_initialize() {
             }
         });
         OutputA.addReference({referenceType: "OrganizedBy",nodeId: ProduktAMonitoring});
+        
 
         var OutputB = addressSpace.addVariable({
             browseName: "OutputB",
             description:"Anzahl vorhandener Produkte des Typs B im Produktordner",
             dataType: "Int32",
-            propertyOf: Machine_1.getComponentByName("Body"),
+            propertyOf: Machine_2.getComponentByName("Body"),
             value:{
                 get: function(){
                     try{
-                        return new opcua.Variant({dataType: "Int32", value:Machine_1.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements().filter(produkt => produkt.getComponentByName("Header").getComponentByName("ProduktTyp").readValue().value.value === producttypes.B).length});        
+                        return new opcua.Variant({dataType: "Int32", value:Machine_2.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements().filter(produkt => produkt.getComponentByName("Header").getComponentByName("ProduktTyp").readValue().value.value === producttypes.B).length});        
                     }catch(err){
                         return new opcua.Variant({dataType: "Int32", value:0});
                     }
@@ -549,7 +688,7 @@ function post_initialize() {
         OutputB.addReference({referenceType: "OrganizedBy",nodeId: ProduktBMonitoring});
 
 //***** OPCUA-Methode zur Erstellung des ProduktsA */
-        var ProduceProductA = addressSpace.addMethod(Machine_1.getComponentByName("Body"),{
+        var ProduceProductA = addressSpace.addMethod(Machine_2.getComponentByName("Body"),{
             modellingRule: "Mandatory",
             nodeId:"ns=2;s=ProduceProductA",
             browseName: "ProduceProductA",
@@ -591,13 +730,17 @@ function post_initialize() {
             var bestellmengeA = inputArguments[4].value;
             var bestellmengeB = inputArguments[5].value;
             var bestellmengeC = inputArguments[6].value;
-            if(Machine_1.getComponentByName("Body").getComponentByName("CurrentAuftrag") === null){
-                createAuftrag(auftraggeber,auftragsnummer,bestellmengeA,bestellmengeB,bestellmengeC);
-            }
             var volumeA = inputArguments[0].value;
-            console.log("Es werden "+volumeA+" Produkte A hergestellt.");
+            outputgoalA += volumeA;
+            if(Machine_2.getComponentByName("Body").getComponentByName("CurrentAuftrag") === null){
+                createAuftrag(auftraggeber,auftragsnummer,bestellmengeA,bestellmengeB,bestellmengeC);
+                console.log("Es werden "+volumeA+" Produkte A, für Auftrag "+auftragsnummer+" hergestellt.");
+            }else if(auftragsnummer === Machine_2.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Header").getComponentByName("Auftragsnummer").readValue().value.value){
+                console.log("Es werden zusätzlich "+volumeA+" Produkte A, für Auftrag "+auftragsnummer+" hergestellt.");
+            }
+            
+            
             var endpointZiel = inputArguments[1].value;
-            outputgoalA = volumeA;
             var speedA = timeToManufactureA*1000;
             var outputA;
 
@@ -606,11 +749,11 @@ function post_initialize() {
                     productionRunsA = true;
                     createProduct(producttypes.A);
                 }
-                productsA = Machine_1.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements().filter(element =>element.getComponentByName("Header").getComponentByName("ProduktTyp").readValue().value.value===producttypes.A); 
+                productsA = Machine_2.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements().filter(element =>element.getComponentByName("Header").getComponentByName("ProduktTyp").readValue().value.value===producttypes.A); 
                 outputA = productsA.length;
-                productsB = Machine_1.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements().filter(element =>element.getComponentByName("Header").getComponentByName("ProduktTyp").readValue().value.value===producttypes.B); 
+                productsB = Machine_2.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements().filter(element =>element.getComponentByName("Header").getComponentByName("ProduktTyp").readValue().value.value===producttypes.B); 
                 outputB = productsB.length;
-                if(outputA>=volumeA){
+                if(outputA>=volumeA || !productionRuns){
                     productionRunsA = false;
                     clearInterval(productionA);
                     setTimeout(function(){
@@ -628,7 +771,7 @@ function post_initialize() {
             callback();
         });
 //***** OPCUA-Methode um Produkt B herzustellen */
-        var ProduceProductB = addressSpace.addMethod(Machine_1.getComponentByName("Body"),{
+        var ProduceProductB = addressSpace.addMethod(Machine_2.getComponentByName("Body"),{
             modellingRule: "Mandatory",
             nodeId:"ns=2;s=ProduceProductB",
             browseName: "ProduceProductB",
@@ -663,20 +806,23 @@ function post_initialize() {
         ProduceProductB.addReference({referenceType: "OrganizedBy",nodeId: ProduktB});
 
         ProduceProductB.bindMethod(function(inputArguments,context,callback){
-            console.log("Production Product B started");            
+            console.log("Production Product B started");
             productionRuns = true;
             var auftraggeber = inputArguments[2].value;
             var auftragsnummer = inputArguments[3].value;
             var bestellmengeA = inputArguments[4].value;
             var bestellmengeB = inputArguments[5].value;
             var bestellmengeC = inputArguments[6].value;
-            if(Machine_1.getComponentByName("Body").getComponentByName("CurrentAuftrag") === null){
-                createAuftrag(auftraggeber,auftragsnummer,bestellmengeA,bestellmengeB,bestellmengeC);
-            }
             var volumeB = inputArguments[0].value;
-            console.log("Es werden "+volumeB+" Produkte B hergestellt.");
-            var endpointZiel = inputArguments[1].value;            
-            outputgoalB = volumeB;
+            outputgoalB += volumeB;
+            if(Machine_2.getComponentByName("Body").getComponentByName("CurrentAuftrag") === null){
+                createAuftrag(auftraggeber,auftragsnummer,bestellmengeA,bestellmengeB,bestellmengeC);
+                console.log("Es werden "+volumeB+" Produkte B, für Auftrag "+ auftragsnummer+" hergestellt.");
+            } else if(auftragsnummer === Machine_2.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Header").getComponentByName("Auftragsnummer").readValue().value.value){
+                console.log("Es werden zusätzlich "+volumeB+" Produkte B,für Auftrag "+auftragsnummer+" hergestellt.");
+            }
+           
+            var endpointZiel = inputArguments[1].value;
             var speedB = timeToManufactureB*1000;
             var outputB;
 
@@ -685,11 +831,11 @@ function post_initialize() {
                     productionRunsB = true;
                     createProduct(producttypes.B);
                 }
-                productsA = Machine_1.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements().filter(element =>element.getComponentByName("Header").getComponentByName("ProduktTyp").readValue().value.value===producttypes.A); 
+                productsA = Machine_2.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements().filter(element =>element.getComponentByName("Header").getComponentByName("ProduktTyp").readValue().value.value===producttypes.A); 
                 outputA = productsA.length;
-                productsB = Machine_1.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements().filter(element =>element.getComponentByName("Header").getComponentByName("ProduktTyp").readValue().value.value===producttypes.B); 
+                productsB = Machine_2.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements().filter(element =>element.getComponentByName("Header").getComponentByName("ProduktTyp").readValue().value.value===producttypes.B); 
                 outputB = productsB.length;
-                if (outputB >= volumeB){
+                if (outputB >= volumeB || !productionRuns){
                     productionRunsB = false;
                     setTimeout(function(){
                         sendProducts(endpointZiel,productsB,producttypes.B);
@@ -710,7 +856,7 @@ function post_initialize() {
 
 
 //***** OPCUA-Methode um Node-Ids der Informationen von ProduktA zu übermitteln */
-        var ProvideDataOfProductA = addressSpace.addMethod(Machine_1.getComponentByName("Body"),{
+        var ProvideDataOfProductA = addressSpace.addMethod(Machine_2.getComponentByName("Body"),{
             browseName: "ProvideDataOfProductA",
             modellingRule: "Mandatory",
             nodeId: "ns=2;s=ProvideDataOfProductA",
@@ -747,7 +893,7 @@ function post_initialize() {
             })
         });
 //***** OPCUA-Methode um Node-Ids der Informationen von ProduktB zu übermitteln */
-        var ProvideDataOfProductB = addressSpace.addMethod(Machine_1.getComponentByName("Body"),{
+        var ProvideDataOfProductB = addressSpace.addMethod(Machine_2.getComponentByName("Body"),{
             browseName: "ProvideDataOfProductB",
             modellingRule: "Mandatory",
             nodeId: "ns=2;s=ProvideDataOfProductB",
@@ -783,8 +929,10 @@ function post_initialize() {
                 ]
             })
         });
+
+
 //***** OPCUA-Methode um Node Id der Production Runs  Variable zu liefern*/
-        var ProvideProductionData = addressSpace.addMethod(Machine_1.getComponentByName("Body"),{
+        var ProvideProductionData = addressSpace.addMethod(Machine_2.getComponentByName("Body"),{
             browseName: "ProvideProductionData",
             modellingRule: "Mandatory",
             nodeId: "ns=2;s=ProvideProductionData",
@@ -810,7 +958,7 @@ function post_initialize() {
         })
 //***** Anmeldung bei der Fabrik über OPCUA-Methode, welche direkt bei Start aufgerufen wird.
 
-        callCreateObject = addressSpace.addMethod(Machine_1.getComponentByName("Body"),{
+        callCreateObject = addressSpace.addMethod(Machine_2.getComponentByName("Body"),{
             browseName: "AnmeldenBeiFabrik",
             modellingRule: "Mandatory",
             inputArguments: [],
@@ -821,44 +969,76 @@ function post_initialize() {
             var showing = Showing.getComponents().map(element => element.browseName.toString());
             var monitoring = Monitoring.getComponents().map(element => element.browseName.toString());
             var methodsession;
+            var registerMethodId;
+            var registerObjectId;
             async.series([
                 function(callback)  {
                     client.connect(endpointFabrik,function (err) {
                         if(err) {
                             console.log(" cannot connect to endpoint :" , endpointFabrik );
                             console.log(err);
-                        } else {
-                            //console.log("connected !"); 
+                        }else{
+                            //console.log("Connected to Fabrik!")
+                            callback(err);
                         }
-                        callback(err);
                     }); 
                 },
-            
-                // step 2 : createSession
                 function(callback) {
                     client.createSession(function(err,session) {
                         if(!err) {
                             methodsession = session;
+                            callback(err);                            
+                        }else{
+                            console.log("Error during Session Creation: "+err);
                         }
-                        callback(err);
                     });
                 },
                 function(callback){
                     methodsession.call({
-                        objectId: 'ns=2;s=Fabrik-Body',
-                        methodId: 'ns=2;s=Fabrik-Body-CreateGeraet',
+                        objectId: "ns=2;s=Manifest",
+                        methodId: "ns=2;s=ManifestPort",
+                        inputArguments:[
+                            {
+                                dataType:"String",
+                                value: msgspec.Header.ORDER
+                            },{
+                                dataType: "String",
+                                value: msgspec.Type.DEVICEMANAGEMENT
+                            },{
+                                dataType: "String",
+                                value: msgspec.Content.DeviceManagement.REGISTER
+                            }
+                        ]
+                    },function(err,response){
+                        //console.log("Request called!");
+                        if (err){
+                            console.log("Error during register request: "+err);
+                        }else{
+                            //console.log(response);
+                            registerMethodId = response.outputArguments[3].value;
+                            registerObjectId = response.outputArguments[4].value;
+                            //console.log("RegisterMethodId: "+registerMethodId);
+                            //console.log("RegisterObjectId: "+registerObjectId);
+                        }
+                        callback(err);
+                    })
+                },
+                function(callback){
+                    methodsession.call({
+                        objectId: registerObjectId,
+                        methodId: registerMethodId,
                         inputArguments: [{
                             dataType: opcua.DataType.String,
                             value: endpointMachine1
                         },{
                             dataType: opcua.DataType.Int32,
-                            value: Machine_1_serialnumber.readValue().value.value
+                            value: Machine_2_serialnumber.readValue().value.value
                         },{
                             dataType: opcua.DataType.String,
-                            value: Machine_1_manufacturer.readValue().value.value
+                            value: Machine_2_manufacturer.readValue().value.value
                         },{
                             dataType: opcua.DataType.String,
-                            value: Machine_1_endpointtype.readValue().value.value
+                            value: Machine_2_endpointtype.readValue().value.value
                         },{
                             dataType: opcua.DataType.String,
                             arrayType: opcua.VariantArrayType.Array,
@@ -876,13 +1056,13 @@ function post_initialize() {
                             value: monitoring
                         }]
                     
-                    },function(err,result){
-                        if(!err){
-                            //console.log("Method succesfully called");
-                            callback();
-                        }else{
-                            console.log(err);
+                    },function(err,response){
+                        //console.log(response);
+                        //console.log(err);
+                        if(err){
+                            console.log("Error during methodCall of register Method: "+err);
                         }
+                        callback(err);
                     });
                 },
                 function(callback){
@@ -895,7 +1075,7 @@ function post_initialize() {
         });
         callCreateObject.execute([],new opcua.SessionContext(),function(err,result){
             if(!err){
-                console.log("Maschine_2 registriert!");
+                console.log("Maschine_1 registriert!");
             }else{
                 console.log(err);
             }
@@ -904,11 +1084,11 @@ function post_initialize() {
 //***** JS-Funktion zur Erstellung von Produkten
 
         function createProduct(produkttyp){
-            var produktnummer = 2000 +produktnr;
+            var produktnummer = 1000 +produktnr;
             var Produkt = AssetType.instantiate({
                 browseName:"Produkt",
                 nodeId:"ns=3;i="+produktnummer,
-                organizedBy: Machine_1.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte")
+                organizedBy: Machine_2.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte")
             });
             var ProduktType = addressSpace.addVariable({
                 browseName: "ProduktTyp",
@@ -985,13 +1165,9 @@ function post_initialize() {
                             value: producttyp
                         }]
                     },function(err,result){
-                        if(!err){                            
-                            methodIdCo = result.outputArguments[3].value;
-                            objectIdCo = result.outputArguments[4].value;
-                            callback();
-                        }else{
-                            console.log(err);
-                        }
+                        methodIdCo = result.outputArguments[3].value;
+                        objectIdCo = result.outputArguments[4].value;
+                        callback();
                     })
                 },  
                 function(callback){
@@ -1007,26 +1183,26 @@ function post_initialize() {
                         },{
                             name: "Auftraggeber",
                             dataType: opcua.DataType.String,
-                            value: Machine_1.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Auftraggeber").readValue().value.value
+                            value: Machine_2.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Auftraggeber").readValue().value.value
                         },{
                             name: "Auftragsnummer",
                             dataType: opcua.DataType.Int32,
-                            value: Machine_1.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Header").getComponentByName("Auftragsnummer").readValue().value.value
+                            value: Machine_2.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Header").getComponentByName("Auftragsnummer").readValue().value.value
                         },{
                             name: "BestellmengeA",
                             dataType: opcua.DataType.Int32,
-                            value: Machine_1.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("BestellmengeA").readValue().value.value
+                            value: Machine_2.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("BestellmengeA").readValue().value.value
                         },{
                             name: "BestellmengeB",
                             dataType: opcua.DataType.Int32,
-                            value: Machine_1.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("BestellmengeB").readValue().value.value
+                            value: Machine_2.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("BestellmengeB").readValue().value.value
                         },{
                             name: "BestellmengeC",
                             dataType: opcua.DataType.Int32,
-                            value: Machine_1.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("BestellmengeC").readValue().value.value
+                            value: Machine_2.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("BestellmengeC").readValue().value.value
                         },]
                     },function(err,result){
-                        if(!err){                            
+                        if(!err){
                             console.log("Senden von "+producttyp+" erfolgreich!");
                             callback();
                         }else{
@@ -1038,8 +1214,8 @@ function post_initialize() {
                     products.forEach(function(product){
                         addressSpace.deleteNode(product);
                     });
-                    if (Machine_1.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements().length === 0){
-                        addressSpace.deleteNode(Machine_1.getComponentByName("Body").getComponentByName("CurrentAuftrag"));
+                    if (Machine_2.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements().length === 0){
+                        addressSpace.deleteNode(Machine_2.getComponentByName("Body").getComponentByName("CurrentAuftrag"));
                     }
                     callback();
                 },
@@ -1055,7 +1231,7 @@ function post_initialize() {
         function createAuftrag(auftraggeber, auftragsnummer,mengeA,mengeB,mengeC){
             var Auftrag = AssetType.instantiate({
                 browseName: "CurrentAuftrag",
-                componentOf: Machine_1.getComponentByName("Body")
+                componentOf: Machine_2.getComponentByName("Body")
             });
 
             var AuftragBody = addressSpace.addObject({
@@ -1382,8 +1558,8 @@ function post_initialize() {
             }else if(header === msgspec.Header.ORDER){
                 if(Capabilities.getFolderElements().map(e => e.browseName.toString()).includes(type)){
                     if(Capabilities.getFolderElements().filter(e => e.browseName.toString() === type)[0].getComponentByName(content)!==null){
-                        var correspondingMethodArray = Capabilities.getFolderElements().filter(e => e.browseName.toString() === type)[0].getComponentByName(content).getFolderElements().filter(e => e.constructor.name ==="UAMethod"); 
-                        if(correspondingMethodArray.length !== 0){
+                        var correspondingMethodArray = Capabilities.getFolderElements().filter(e => e.browseName.toString() === type)[0].getComponentByName(content).getFolderElements().filter(e => e.constructor.name ==="UAMethod");
+                        if (correspondingMethodArray.length != 0){
                             var nodeIdToRespond = correspondingMethodArray[0].nodeId.toString();
                             var objectIdToRespond = addressSpace.findNode(nodeIdToRespond).parent.nodeId.toString();
                             callback(null,{
@@ -1403,6 +1579,7 @@ function post_initialize() {
                                         valueRank:1,
                                         value: [0]
                                     },{
+                                        name: "NodeIdOfMethodToCall",
                                         dataType:"String",
                                         value: nodeIdToRespond
                                     },{
@@ -1445,8 +1622,7 @@ function post_initialize() {
                                 ]
                             });
                             return;
-                        }
-                        
+                        } 
                     }
                 }
                 callback(null,{
@@ -1483,7 +1659,7 @@ function post_initialize() {
     server.start(function() {
         console.log("Server is now listening ... ( press CTRL+C to stop)");
         console.log("port ", server.endpoints[0].port);
-        console.log(" the primary server endpoint url is ", endpointMachine1 );
+        console.log(" the primary server endpoint url is ", endpointMachine2 );
     });
 }
 server.initialize(post_initialize);
