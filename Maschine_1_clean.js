@@ -25,7 +25,7 @@ var server = new opcua.OPCUAServer({
     }
 });
 
-var endpointFabrik = "opc.tcp://Johanness-MacBook-Pro-693.local:4337/UA/modellfabrik";
+var endpointFabrik = "opc.tcp://Johanness-MacBook-Pro-1057.local:4337/UA/modellfabrik";
 var endpointMachine1 = server.endpoints[0].endpointDescriptions()[0].endpointUrl;
 
 function post_initialize() {
@@ -444,9 +444,105 @@ function post_initialize() {
             nodeId:"ns=2;s=SafeShutdown",
             browseName: "SafeShutdown",
         });
-                        
+
         SafeShutdown.bindMethod(function(inputArgumens,context,callback){
+            //Zunächst beenden der Produktion --> führt auch zum senden der Produkte an die nächste Instanz
             productionRuns = false;
+            //Aufrufen der remove Methode in der Fabrik --> entfernen des Devices + letzter Status der übergeben wird.
+            var unregistersession;
+            var unregisterMethodId;
+            var unregisterObjectId;
+            async.series([
+                function(callback)  {
+                    client.connect(endpointFabrik,function (err) {
+                        if(err) {
+                            console.log(" cannot connect to endpoint :" , endpointFabrik );
+                            console.log(err);
+                        }
+                        callback(err);
+                    }); 
+                },
+                function(callback) {
+                    client.createSession(function(err,session) {
+                        if(!err) {
+                            unregistersession = session;
+                        }
+                        callback(err);
+                    });
+                },
+                function(callback){
+                    unregistersession.call({
+                        objectId: "ns=2;s=Manifest",
+                        methodId: "ns=2;s=ManifestPort",
+                        inputArguments:[
+                            {
+                                dataType: "String",
+                                value: msgspec.Header.ORDER
+                            },{
+                                dataType: "String",
+                                value: msgspec.Type.DEVICEMANAGEMENT
+                            },{
+                                dataType: "String",
+                                value: msgspec.Content.DeviceManagement.REMOVE
+                            }
+                        ]
+                    },function(err,response){
+                        if (err){
+                            console.log("Error during Unregister request: "+err);
+                        }else{
+                            //console.log(response);
+                            unregisterMethodId = response.outputArguments[3].value;
+                            unregisterObjectId = response.outputArguments[4].value;
+                            //console.log(unregisterMethodId);
+                            //console.log(unregisterObjectId);
+                            callback();
+                        }
+                    })
+                },
+                function(callback){
+                    unregistersession.call({
+                        objectId:unregisterObjectId,
+                        methodId:unregisterMethodId,
+                        inputArguments:[
+                            {
+                                dataType: "Int32",
+                                value:outputgoalA
+                            },{
+                                dataType: "Int32",
+                                value: OutputA.readValue().value.value
+                            },{
+                                dataType: "Int32",
+                                value: outputgoalB
+                            },{
+                                dataType: "Int32",
+                                value: OutputB.readValue().value.value
+                            },{
+                                dataType: "Int32",
+                                value: 0
+                            },{
+                                dataType: "Int32",
+                                value: 0
+                            },{
+                                dataType: "String",
+                                value: endpointMachine1
+                            }
+                        ]
+                    },function(err,response){
+                        if (err){
+                            console.log("Error during removal of device: "+err);
+                        }else{
+                            console.log("Device sucessfully removed");
+                        }
+                        callback();
+                    })
+                },
+                function(callback){
+                    unregistersession.close();
+                    client.disconnect();
+                    callback();
+                }
+            ]);
+            //Herunterfahren des Servers.
             server.shutdown(1000,function(err){
                 if (!err){
                     console.log("Maschine1 wird heruntergefahren");
@@ -634,13 +730,17 @@ function post_initialize() {
             var bestellmengeA = inputArguments[4].value;
             var bestellmengeB = inputArguments[5].value;
             var bestellmengeC = inputArguments[6].value;
+            var volumeA = inputArguments[0].value;
+            outputgoalA += volumeA;
             if(Machine_1.getComponentByName("Body").getComponentByName("CurrentAuftrag") === null){
                 createAuftrag(auftraggeber,auftragsnummer,bestellmengeA,bestellmengeB,bestellmengeC);
+                console.log("Es werden "+volumeA+" Produkte A, für Auftrag "+auftragsnummer+" hergestellt.");
+            }else if(auftragsnummer === Machine_1.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Header").getComponentByName("Auftragsnummer").readValue().value.value){
+                console.log("Es werden zusätzlich "+volumeA+" Produkte A, für Auftrag "+auftragsnummer+" hergestellt.");
             }
-            var volumeA = inputArguments[0].value;
-            console.log("Es werden "+volumeA+" Produkte A hergestellt.");
+            
+            
             var endpointZiel = inputArguments[1].value;
-            outputgoalA = volumeA;
             var speedA = timeToManufactureA*1000;
             var outputA;
 
@@ -713,13 +813,16 @@ function post_initialize() {
             var bestellmengeA = inputArguments[4].value;
             var bestellmengeB = inputArguments[5].value;
             var bestellmengeC = inputArguments[6].value;
+            var volumeB = inputArguments[0].value;
+            outputgoalB += volumeB;
             if(Machine_1.getComponentByName("Body").getComponentByName("CurrentAuftrag") === null){
                 createAuftrag(auftraggeber,auftragsnummer,bestellmengeA,bestellmengeB,bestellmengeC);
+                console.log("Es werden "+volumeB+" Produkte B, für Auftrag "+ auftragsnummer+" hergestellt.");
+            } else if(auftragsnummer === Machine_1.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Header").getComponentByName("Auftragsnummer").readValue().value.value){
+                console.log("Es werden zusätzlich "+volumeB+" Produkte B,für Auftrag "+auftragsnummer+" hergestellt.");
             }
-            var volumeB = inputArguments[0].value;
-            console.log("Es werden "+volumeB+" Produkte B hergestellt.");
+           
             var endpointZiel = inputArguments[1].value;
-            outputgoalB = volumeB;
             var speedB = timeToManufactureB*1000;
             var outputB;
 
@@ -874,26 +977,56 @@ function post_initialize() {
                         if(err) {
                             console.log(" cannot connect to endpoint :" , endpointFabrik );
                             console.log(err);
-                        } else {
-                            console.log("connected !"); 
+                        }else{
+                            //console.log("Connected to Fabrik!")
+                            callback(err);
                         }
-                        callback(err);
                     }); 
                 },
-            
-                // step 2 : createSession
                 function(callback) {
                     client.createSession(function(err,session) {
                         if(!err) {
                             methodsession = session;
+                            callback(err);                            
+                        }else{
+                            console.log("Error during Session Creation: "+err);
                         }
-                        callback(err);
                     });
                 },
                 function(callback){
                     methodsession.call({
-                        objectId: 'ns=2;s=Fabrik-Body',
-                        methodId: 'ns=2;s=Fabrik-Body-CreateGeraet',
+                        objectId: "ns=2;s=Manifest",
+                        methodId: "ns=2;s=ManifestPort",
+                        inputArguments:[
+                            {
+                                dataType:"String",
+                                value: msgspec.Header.ORDER
+                            },{
+                                dataType: "String",
+                                value: msgspec.Type.DEVICEMANAGEMENT
+                            },{
+                                dataType: "String",
+                                value: msgspec.Content.DeviceManagement.REGISTER
+                            }
+                        ]
+                    },function(err,response){
+                        //console.log("Request called!");
+                        if (err){
+                            console.log("Error during register request: "+err);
+                        }else{
+                            //console.log(response);
+                            registerMethodId = response.outputArguments[3].value;
+                            registerObjectId = response.outputArguments[4].value;
+                            //console.log("RegisterMethodId: "+registerMethodId);
+                            //console.log("RegisterObjectId: "+registerObjectId);
+                        }
+                        callback(err);
+                    })
+                },
+                function(callback){
+                    methodsession.call({
+                        objectId: registerObjectId,
+                        methodId: registerMethodId,
                         inputArguments: [{
                             dataType: opcua.DataType.String,
                             value: endpointMachine1
