@@ -14,7 +14,7 @@ var msgspec = require('./MessageSpecification.json');
 
 var client =  new opcua.OPCUAClient({endpoint_must_exist:false});
 var server = new opcua.OPCUAServer({
-    port: 4334, // the port of the listening socket of the server
+    port: 4338, // the port of the listening socket of the server
     maxAllowedSessionNumber: 100,
     resourcePath: "UA/Machine_2", // this path will be added to the endpoint resource name
     nodeset_filename: [opcua.standard_nodeset_file], //"/home/pi/modellfabrik/aas_for_import.xml"],
@@ -524,7 +524,7 @@ function post_initialize() {
                                 value: 0
                             },{
                                 dataType: "String",
-                                value: endpointMachine1
+                                value: endpointMachine2
                             }
                         ]
                     },function(err,response){
@@ -644,7 +644,7 @@ function post_initialize() {
             componentOf: Machine_2.getComponentByName("Header"),
             value: {
                 get: function(){
-                    return new opcua.Variant({dataType: "String", value: endpointMachine1});
+                    return new opcua.Variant({dataType: "String", value: endpointMachine2});
                 }
             }
         });
@@ -1029,7 +1029,7 @@ function post_initialize() {
                         methodId: registerMethodId,
                         inputArguments: [{
                             dataType: opcua.DataType.String,
-                            value: endpointMachine1
+                            value: endpointMachine2
                         },{
                             dataType: opcua.DataType.Int32,
                             value: Machine_2_serialnumber.readValue().value.value
@@ -1075,7 +1075,7 @@ function post_initialize() {
         });
         callCreateObject.execute([],new opcua.SessionContext(),function(err,result){
             if(!err){
-                console.log("Maschine_1 registriert!");
+                console.log("Maschine_2 registriert!");
             }else{
                 console.log(err);
             }
