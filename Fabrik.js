@@ -585,9 +585,9 @@ function post_initialize() {
 
             var auftragsnr = auftragsnummer;
             var auftragsstatus = auftragsstat.WAITING;
-                                            
+
             // Anlegen der Auftragsdaten
-                                            
+
             var Auftrag = AssetType.instantiate({
                 browseName: "Auftrag",
                 organizedBy: Auftragsordner
@@ -701,31 +701,24 @@ function post_initialize() {
             //Anlegen der entsprechenden Produkte
 
             for (var i = 0; i < mengeA;i++){
-                createProduct(Auftrag,producttypes.A,false);
+                createProduct(Auftrag,producttypes.A);
             }
             for (var i = 0; i < mengeB;i++){
-                createProduct(Auftrag,producttypes.B,false);
+                createProduct(Auftrag,producttypes.B);
             }
             for (var i = 0; i < mengeC;i++){
-                createProduct(Auftrag,producttypes.C,false);
+                createProduct(Auftrag,producttypes.C);
             }
-            for (var i = 0; i < mengeAReal-mengeA;i++){
-                createProduct(Auftrag,producttypes.A,true);
-            }
-            for (var i = 0; i < mengeBReal-mengeB;i++){
-                createProduct(Auftrag,producttypes.B,true);
-            }
-
             console.log("Auftrag "+ auftragsnr+" created!");
             auftragsnummer++;
             callback(null,{
                 statusCode: opcua.StatusCodes.Good,
                 outputArguments:[]
             });
-        })
-//****** JS-Methode zur Produkterstellung  von Produkten
+        });
+//****** JS-Methode zur Produkterstellung
 
-        function createProduct(Auftrag,produkttyp,productForContinuedProduction){
+        function createProduct(Auftrag,produkttyp){
             var produktnr = produktnummer;
             var Produkt = AssetType.instantiate({
                 browseName:"Produkt",
@@ -757,14 +750,14 @@ function post_initialize() {
                 browseName: "ProductLifecycle"
             });
 
-            var Creation = addressSpace.addObject({
+            var ProductionProduct = addressSpace.addObject({
                 componentOf: ProductLifecycle,
-                browseName: "Creation"
+                browseName: capabilities.PRODUCING
             });
 
             var numberInSequenceCreation = addressSpace.addVariable({
                 browseName: "numberInSequence",
-                propertyOf: Creation,
+                propertyOf: ProductionProduct,
                 dataType: "Int32",
                 value: {
                     get: function(){
@@ -772,43 +765,20 @@ function post_initialize() {
                     }
                 }
             })
-            if (produkttyp != producttypes.C){
-                var requiredCapabilityCreation = addressSpace.addVariable({
-                    propertyOf: Creation,
-                    browseName: "requiredCapability",
-                    dataType: "String",
-                    value:{
-                        get: function(){
-                            return new opcua.Variant({dataType: "String",value: capabilities.PRODUCING});
-                        }
-                    }
-                });
-            }else{
-                var requiredCapabilityCreation = addressSpace.addVariable({
-                    propertyOf: Creation,
-                    browseName: "requiredCapability",
-                    dataType: "String",
-                    value:{
-                        get: function(){
-                            return new opcua.Variant({dataType: "String",value: capabilities.ASSEMBLING});
-                        }
-                    }
-                });
-            }
             
-            var finishedCreationLocal = false;
-            var finishedCreation = addressSpace.addVariable({
-                propertyOf: Creation,
+            var finishedProductionProductLocal = false;
+            var finishedProductionProduct = addressSpace.addVariable({
+                propertyOf: ProductionProduct,
                 browseName: "finished",
                 dataType: "Boolean",
                 value:{
                     get: function(){
-                        return new opcua.Variant({dataType: "Boolean",value: finishedCreationLocal});
+                        return new opcua.Variant({dataType: "Boolean",value: finishedProductionProductLocal});
                     },
                     set: function(variant){
-                        finishedCreationLocal = true;
-                        var finishedCreationOn = addressSpace.addVariable({
-                            propertyOf: finishedCreation,
+                        finishedProductionProductLocal = true;
+                        var finishedProductionProductOn = addressSpace.addVariable({
+                            propertyOf: finishedProductionProduct,
                             browseName: "finishedOn",
                             dataType: "String",
                             value: {
@@ -821,56 +791,6 @@ function post_initialize() {
                 }
             });
 
-            if (productForContinuedProduction && produkttyp != producttypes.C){
-                var processing = addressSpace.addObject({
-                    componentOf: ProductLifecycle,
-                    browseName: "Processing"
-                });
-                var finishedProcessingLocal = false;
-                var finishedProcessing = addressSpace.addVariable({
-                    propertyOf: processing,
-                    browseName: "finished",
-                    dataType: "Boolean",
-                    value:{
-                        get: function(){
-                            return new opcua.Variant({dataType: "Boolean",value: finishedProcessingLocal});
-                        },
-                        set: function(variant){
-                            finishedProcessingLocal = true;
-                            var finishedProcessingOn = addressSpace.addVariable({
-                                propertyOf: finishedProcessing,
-                                browseName: "finishedOn",
-                                dataType: "String",
-                                value: {
-                                    get: function(){
-                                        return new opcua.Variant({dataType: "String",value: variant.value});
-                                    }
-                                }
-                            });
-                        }
-                    }
-                });
-                var requiredCapabilityProcessing = addressSpace.addVariable({
-                    dataType: "String",
-                    propertyOf: processing,
-                    browseName: "requiredCapability",
-                    value:{
-                        get: function(){
-                            return new opcua.Variant({dataType: "String",value: capabilities.ASSEMBLING});
-                        }
-                    }
-                });
-                var numberInSequenceProcessing = addressSpace.addVariable({
-                    dataType: "String",
-                    propertyOf: processing,
-                    browseName: "numberInSequence",
-                    value:{
-                        get: function(){
-                            return new opcua.Variant({dataType: "Int32",value:2});
-                        }
-                    }
-        });
-            }
             var ProduktStatus = addressSpace.addVariable({
                 componentOf: Produkt.getComponentByName("Body"),
                 browseName: "ProduktStatus",
@@ -888,7 +808,7 @@ function post_initialize() {
             });
             produktnummer++;
         }
-        
+
 
 //****** OPCUA-Methode zum Anlegen der von Geräten  */
 
