@@ -7,6 +7,7 @@ var help = require('./help.js');
 var producttypes = require('./producttypes.json');
 var capabilities = require('./capabilities.json');
 var msgspec = require('./MessageSpecification.json');
+var productstat = require('./productstatus.json');
 
 var server = new opcua.OPCUAServer({
     port: 4337, // the port of the listening socket of the server
@@ -33,6 +34,7 @@ function post_initialize() {
         var availableEndpoints =[];
         var productionRuns = false;
         var auftragFinished = false;
+        var produktnummer = 1;
 
 //****** Definition abstrakter Asset Type mit Body & Header*/
         var AssetType = addressSpace.addObjectType({
@@ -572,402 +574,20 @@ function post_initialize() {
             }],
             outputArguments: []
         });
-        createAuftrag.bindMethod(function (inputArguments, context, callback){
+        
+        createAuftrag.bindMethod(function(inputArguments,context, callback){
             var mengeA = inputArguments[0].value;
             var mengeB = inputArguments[1].value;
             var mengeC = inputArguments[2].value;
-            var auftragsObjekt ={};
-            auftragsObjekt[producttypes.A] = mengeA;
-            auftragsObjekt[producttypes.B] = mengeB;
-            auftragsObjekt[producttypes.C] = mengeC;
+            var mengeAReal = mengeA+mengeC*2;
+            var mengeBReal = mengeB+mengeC;
+            var mengeCReal = mengeC;
+
             var auftragsnr = auftragsnummer;
             var auftragsstatus = auftragsstat.WAITING;
-            if (Capabilities.getFolderElements().filter(e => e.browseName.toString()===capabilities.PRODUCING).length === 0){
-                callback(null,{
-                    statusCode: opcua.StatusCodes.Bad,
-                    outputArguments:[]
-                });
-                console.log("Der Auftrag "+auftragsnr+ " kannn nicht angenommen werden, da die geforderten Produkte nicht erstellt werden können");
-                return;
-            }else{
-                var producing = Capabilities.getFolderElements().filter(e=> e.browseName.toString()=== capabilities.PRODUCING)[0];
-                if((mengeA> 0 && producing.getComponentByName(producttypes.A)=== null)||(mengeB > 0 && producing.getComponentByName(producttypes.B)===null)||(mengeC > 0 && producing.getComponentByName(producttypes.C) === null)){
-                    callback(null,{
-                        statusCode: opcua.StatusCodes.Bad,
-                        outputArguments:[]
-                    });
-                    console.log("Der Auftrag "+auftragsnr+ " kannn nicht angenommen werden, da die geforderten Produkte nicht erstellt werden können");
-                    return;
-                }else{
-                    if (mengeC > 0){
-                        var geraeteToProduceC = producing.getComponentByName(producttypes.C).getFolderElements().map(element => element.getComponentByName("Manifest").getComponentByName("Identification").getFolderElements().filter(e => e.browseName.toString() === "Adresse")[0].readValue().value.value);
-                        geraeteToProduceC.forEach(function(element){
-                            var connectionsession;
-                            async.series([
-                                function(callback){
-                                    client.connect(element,function(err){
-                                        if(!err){
-                                            callback();
-                                        }
-                                    });
-                                },
-                                function(callback){
-                                    client.createSession(function(err,session){
-                                        if(!err){
-                                            connectionsession = session;
-                                            callback();
-                                        }
-                                    });
-                                },
-                                function(callback){
-                                    connectionsession.call({
-                                        objectId: "ns=2;s=Manifest",
-                                        methodId: "ns=2;s=ManifestPort",
-                                        inputArguments:[{
-                                            name: "Header",
-                                            value: msgspec.Header.REQUEST,
-                                            dataType:"String"
-                                        },{
-                                            name: "Type",
-                                            value: msgspec.Type.PRODUCING,
-                                            dataType:"String"
-                                        },{
-                                            name: "Content",
-                                            value: producttypes.C,
-                                            dataType:"String"
-                                        }]
-                                    },function(err,result){
-                                        if(!err){
-                                            var aktMachine = producing.getComponentByName(producttypes.C).getFolderElements().filter(e => e.getComponentByName("Manifest").getComponentByName("Identification").getFolderElements().filter(i => i.browseName.toString() ==="Adresse")[0].readValue().value.value === element)[0];
-                                            var aktMachineProdPC = aktMachine.getComponentByName("Manifest").getComponentByName("Capabilities").getFolderElements().filter(e => e.browseName.toString() === msgspec.Type.PRODUCING)[0].getFolderElements().filter(e => e.browseName.toString() === producttypes.C)[0];
-                                            if(aktMachineProdPC.getPropertyByName("Input") === null){
-                                                var InputProductC = addressSpace.addObject({
-                                                    browseName: "Input",
-                                                    propertyOf: aktMachineProdPC,
-                                                    typeDefinition: folderType
-                                                });
-                                            }
-                                            if(aktMachineProdPC.getPropertyByName("TimeToManufacture") === null){
-                                                addressSpace.addVariable({
-                                                    browseName: "TimeToManufacture",
-                                                    propertyOf: aktMachineProdPC,
-                                                    dataType: "Int32",
-                                                    value: {
-                                                        get: function(){
-                                                            return new opcua.Variant({dataType: "Int32",value: result.outputArguments[0].value});
-                                                        }
-                                                    }
-                                                })
-                                            }else{
-                                               //aktMachineProdPC.getPropertyByName("TimeToManufacture").writeValue(new opcua.SessionContext(),{value: result.outputArguments[0].value},function(err,statusCode){});
-                                            }
                                             
-                                            var inputObj = {};
-                                            var inputArray = result.outputArguments[1].value;
-                                            var inputNumberArray = result.outputArguments[2].value;
-                                            for(var i = 0;i < result.outputArguments[1].value.length;i++){
-                                                var aktMachineInp = aktMachineProdPC.getPropertyByName("Input").getFolderElements().map(e => e = e.browseName.toString());
-                                                var number = inputNumberArray[i];
-                                                var name = inputArray[i];
-                                                if(!aktMachineInp.includes(result.outputArguments[1].value[i])){
-                                                    var InputProdukt = addressSpace.addObject({
-                                                        browseName: result.outputArguments[1].value[i],
-                                                        organizedBy: aktMachineProdPC.getPropertyByName("Input")
-                                                    });
-                                                    var productTypeInputProdukt = function (name){
-                                                        var ProductTypeInputProdukt = {
-                                                            browseName: "ProduktTyp",
-                                                            propertyOf: InputProdukt,
-                                                            dataType: "String",
-                                                            value: {
-                                                                get: function(){
-                                                                    return new opcua.Variant({dataType:"String",value: name});
-                                                                },
-                                                                set: function(variant){
-                                                                    name = variant.value;
-                                                                    return opcua.StatusCodes.Good;
-                                                                }
-                                                            }
-                                                        };
-    
-                                                        return ProductTypeInputProdukt;
-                                                    }(name);
-    
-                                                    var numberInputProdukt = function(number){
-                                                        var NumberInputProdukt = {
-                                                            browseName: "Number",
-                                                            dataType: "Int32",
-                                                            propertyOf: InputProdukt,
-                                                            value: {
-                                                                get: function(){
-                                                                    return new opcua.Variant({dataType: "Int32", value:number});
-                                                                },
-                                                                set: function(variant){
-                                                                    number = variant.value;
-                                                                    return opcua.StatusCodes.Good;
-                                                                }
-                                                            }
-                                                        }
-                                                        return NumberInputProdukt;
-                                                    }(number);
-                                                    console.log(productTypeInputProdukt);
-                                                    addressSpace.addVariable(productTypeInputProdukt);
-                                                    addressSpace.addVariable(numberInputProdukt);
-                                                }
-                                                auftragsObjekt[result.outputArguments[1].value[i]] += (result.outputArguments[2].value[i]*auftragsObjekt[producttypes.C]);
-                                            }
-                                            callback();
-                                        }
-                                    })
-                                },
-                                function(callback){
-                                    connectionsession.close();
-                                    client.disconnect(function(err){
-                                        if(!err){
-                                            callback();
-                                        }
-                                    })
-                                }
-                                
-                            ]);
-                        });
-                        
-                    }
-                    if (mengeB > 0){
-                        var geraeteToProduceB = producing.getComponentByName(producttypes.B).getFolderElements().map(element => element.getComponentByName("Manifest").getComponentByName("Identification").getFolderElements().filter(e => e.browseName.toString() === "Adresse")[0].readValue().value.value);
-                        geraeteToProduceB.forEach(function(element){
-                            var client1 = new opcua.OPCUAClient();
-                            var connectionsession;
-                            async.series([
-                                function(callback){
-                                    client1.connect(element,function(err){
-                                        if(!err){
-                                            callback();
-                                        }
-                                    });
-                                },
-                                function(callback){
-                                    client1.createSession(function(err,session){
-                                        if(!err){
-                                            connectionsession = session;
-                                            callback();
-                                        }
-                                    });
-                                },
-                                function(callback){
-                                    connectionsession.call({
-                                        objectId: "ns=2;s=Manifest",
-                                        methodId: "ns=2;s=ManifestPort",
-                                        inputArguments:[{
-                                            name: "Header",
-                                            value: msgspec.Header.REQUEST,
-                                            dataType:"String"
-                                        },{
-                                            name: "Type",
-                                            value: msgspec.Type.PRODUCING,
-                                            dataType:"String"
-                                        },{
-                                            name: "Content",
-                                            value: producttypes.B,
-                                            dataType:"String"
-                                        }]
-                                    },function(err,result){
-                                        if(!err){
-                                            var aktMachine = producing.getComponentByName(producttypes.B).getFolderElements().filter(e => e.getComponentByName("Manifest").getComponentByName("Identification").getFolderElements().filter(i => i.browseName.toString() ==="Adresse")[0].readValue().value.value === element)[0];
-                                            var aktMachineProdPB = aktMachine.getComponentByName("Manifest").getComponentByName("Capabilities").getFolderElements().filter(e => e.browseName.toString() === msgspec.Type.PRODUCING)[0].getFolderElements().filter(e => e.browseName.toString() === producttypes.B)[0];
-                                            if(aktMachineProdPB.getPropertyByName("Input") === null){
-                                                var InputProductB = addressSpace.addObject({
-                                                    browseName: "Input",
-                                                    propertyOf: aktMachineProdPB,
-                                                    typeDefinition: folderType
-                                                });
-                                            }
-                                            if(aktMachineProdPB.getPropertyByName("TimeToManufacture") === null){
-                                                addressSpace.addVariable({
-                                                    browseName: "TimeToManufacture",
-                                                    propertyOf: aktMachineProdPB,
-                                                    dataType: "Int32",
-                                                    value: {
-                                                        get: function(){
-                                                            return new opcua.Variant({dataType: "Int32",value: result.outputArguments[0].value});
-                                                        }
-                                                    }
-                                                })
-                                            }else{
-                                               //aktMachineProdPB.getPropertyByName("TimeToManufacture").writeValue(new opcua.SessionContext(),{dataType: "Int32",value: result.outputArguments[0].value},function(err,statusCode){});
-                                            }
+            // Anlegen der Auftragsdaten
                                             
-                                            for(var i = 0;i < result.outputArguments[1].value.length;i++){
-                                                var aktMachineInp = aktMachineProdPB.getPropertyByName("Input").getFolderElements().map(e => e = e.browseName.toString());
-                                                if(!aktMachineInp.includes(result.outputArguments[1].value[i])){
-                                                    var InputProdukt = addressSpace.addObject({
-                                                        browseName: result.outputArguments[1].value[i],
-                                                        organizedBy: aktMachineProdPB.getPropertyByName("Input")
-                                                    });
-                                                    var productTypeInputProdukt = addressSpace.addVariable({
-                                                        browseName: "ProduktTyp",
-                                                        propertyOf: InputProdukt,
-                                                        dataType: "String",
-                                                        value: {
-                                                            get: function(){
-                                                                return new opcua.Variant({dataType:"String",value:result.outputArguments[1].value[i]});
-                                                            }
-                                                        }
-                                                    });
-                                                    var NumberInputProdukt = addressSpace.addVariable({
-                                                        browseName: "Number",
-                                                        dataType: "Int32",
-                                                        propertyOf: InputProdukt,
-                                                        value: {
-                                                            get: function(){
-                                                                return new opcua.Variant({dataType: "Int32", value: result.outputArguments[2].value[i]});
-                                                            }
-                                                        }
-                                                    })
-                                                }
-                                                auftragsObjekt[result.outputArguments[1].value[i]] += (result.outputArguments[2].value[i]*auftragsObjekt[producttypes.B]);
-                                            }
-                                            callback();
-                                        }
-                                    });
-                                },
-                                function(callback){
-                                    connectionsession.close();                                    
-                                    client1.disconnect(function(err){
-                                        if(!err){
-                                            callback();
-                                        }
-                                    });
-                                }
-                                
-                            ]);
-                        });
-                        
-                    }
-                    if (mengeA > 0){
-                        var geraeteToProduceA = producing.getComponentByName(producttypes.A).getFolderElements().map(element => element.getComponentByName("Manifest").getComponentByName("Identification").getFolderElements().filter(e => e.browseName.toString() === "Adresse")[0].readValue().value.value);                        
-                        geraeteToProduceA.forEach(function(element){
-                            var client2 = new opcua.OPCUAClient();
-                            var connectionsession2;
-                            async.series([
-                                function(callback){
-                                    client2.connect(element,function(err){
-                                        if(!err){
-                                            callback();
-                                        }else{
-                                            console.log(err);
-                                        }
-                                    });
-                                },
-                                function(callback){
-                                    client2.createSession(function(err,session){
-                                        if(!err){
-                                            connectionsession2 = session;
-                                            callback();
-                                        }
-                                    });
-                                },
-                                function(callback){
-                                    connectionsession2.call({
-                                        objectId: "ns=2;s=Manifest",
-                                        methodId: "ns=2;s=ManifestPort",
-                                        inputArguments:[{
-                                            name: "Header",
-                                            value: msgspec.Header.REQUEST,
-                                            dataType:"String"
-                                        },{
-                                            name: "Type",
-                                            value: msgspec.Type.PRODUCING,
-                                            dataType:"String"
-                                        },{
-                                            name: "Content",
-                                            value: producttypes.A,
-                                            dataType:"String"
-                                        }]
-                                    },function(err,result){
-                                        if(!err){
-                                            var aktMachine = producing.getComponentByName(producttypes.A).getFolderElements().filter(e => e.getComponentByName("Manifest").getComponentByName("Identification").getFolderElements().filter(i => i.browseName.toString() ==="Adresse")[0].readValue().value.value === element)[0];
-                                            var aktMachineProdPA = aktMachine.getComponentByName("Manifest").getComponentByName("Capabilities").getFolderElements().filter(e => e.browseName.toString() === msgspec.Type.PRODUCING)[0].getFolderElements().filter(e => e.browseName.toString() === producttypes.A)[0];
-                                            if(aktMachineProdPA.getPropertyByName("Input") === null){
-                                                var InputProductA = addressSpace.addObject({
-                                                    browseName: "Input",
-                                                    propertyOf: aktMachineProdPA,
-                                                    typeDefinition: folderType
-                                                });
-                                            }
-                                            if(aktMachineProdPA.getPropertyByName("TimeToManufacture") === null){
-                                                addressSpace.addVariable({
-                                                    browseName: "TimeToManufacture",
-                                                    propertyOf: aktMachineProdPA,
-                                                    dataType: "Int32",
-                                                    value: {
-                                                        get: function(){
-                                                            return new opcua.Variant({dataType: "Int32",value: result.outputArguments[0].value});
-                                                        }
-                                                    }
-                                                })
-                                            }else{
-                                               //aktMachineProdPA.getPropertyByName("TimeToManufacture").writeValue(new opcua.SessionContext(),{value: result.outputArguments[0].value},function(err,statusCode){});
-                                            }
-                                            
-                                            for(var i = 0;i < result.outputArguments[1].value.length;i++){
-                                                var aktMachineInp = aktMachineProdPC.getPropertyByName("Input").getFolderElements().map(e => e = e.browseName.toString());
-                                                if(!aktMachineInp.includes(result.outputArguments[1].value[i])){
-                                                    var InputProdukt = addressSpace.addObject({
-                                                        browseName: result.outputArguments[1].value[i],
-                                                        organizedBy: aktMachineProdPA.getPropertyByName("Input")
-                                                    });
-                                                    var productTypeInputProdukt = addressSpace.addVariable({
-                                                        browseName: "ProduktTyp",
-                                                        propertyOf: InputProdukt,
-                                                        dataType: "String",
-                                                        value: {
-                                                            get: function(){
-                                                                return new opcua.Variant({dataType:"String",value:result.outputArguments[1].value[i]});
-                                                            }
-                                                        }
-                                                    });
-                                                    var NumberInputProdukt = addressSpace.addVariable({
-                                                        browseName: "Number",
-                                                        dataType: "Int32",
-                                                        propertyOf: InputProdukt,
-                                                        value: {
-                                                            get: function(){
-                                                                return new opcua.Variant({dataType: "Int32", value: result.outputArguments[2].value[i]});
-                                                            }
-                                                        }
-                                                    })
-                                                }
-                                                auftragsObjekt[result.outputArguments[1].value[i]] += (result.outputArguments[2].value[i]*auftragsObjekt[producttypes.A]);
-                                            }
-                                            callback();
-                                        }
-                                    })
-                                },
-                                function(callback){
-                                    connectionsession2.close();
-                                    client2.disconnect(function(err){
-                                        if(!err){
-                                            callback();
-                                        }
-                                    })
-                                }
-                                
-                            ]);
-                        });
-                        
-                    }
-                    if((mengeA> 0 && producing.getComponentByName(producttypes.A)=== null)||(mengeB > 0 && producing.getComponentByName(producttypes.B)===null)||(mengeC > 0 && producing.getComponentByName(producttypes.C) === null)){
-                        callback(null,{
-                            statusCode: opcua.StatusCodes.Bad,
-                            outputArguments:[]
-                        });
-                        console.log("Der Auftrag "+auftragsnr+ " kannn nicht angenommen werden, da die geforderten Produkte nicht erstellt werden können");
-                        return;
-                    }
-                }
-            }
-                    
             var Auftrag = AssetType.instantiate({
                 browseName: "Auftrag",
                 organizedBy: Auftragsordner
@@ -1032,7 +652,7 @@ function post_initialize() {
                 browseName: "BerechneteMengeA",
                 value: {
                     get: function(){
-                        return new opcua.Variant({dataType: "Int32", value: auftragsObjekt[producttypes.A]})
+                        return new opcua.Variant({dataType: "Int32", value: mengeAReal})
                     }
                 }
             });
@@ -1042,7 +662,7 @@ function post_initialize() {
                 browseName: "BerechneteMengeB",
                 value: {
                     get: function(){
-                        return new opcua.Variant({dataType: "Int32", value: auftragsObjekt[producttypes.B]})
+                        return new opcua.Variant({dataType: "Int32", value: mengeBReal})
                     }
                 }
             });
@@ -1052,7 +672,7 @@ function post_initialize() {
                 browseName: "BerechneteMengeC",
                 value: {
                     get: function(){
-                        return new opcua.Variant({dataType: "Int32", value: auftragsObjekt[producttypes.C]})
+                        return new opcua.Variant({dataType: "Int32", value: mengeCReal})
                     }
                 }
             });
@@ -1077,16 +697,200 @@ function post_initialize() {
                 browseName: "Zugehoerige Produkte",
                 typeDefinition: folderType
             })
+
+            //Anlegen der entsprechenden Produkte
+
+            for (var i = 0; i < mengeA;i++){
+                createProduct(Auftrag,producttypes.A,false);
+            }
+            for (var i = 0; i < mengeB;i++){
+                createProduct(Auftrag,producttypes.B,false);
+            }
+            for (var i = 0; i < mengeC;i++){
+                createProduct(Auftrag,producttypes.C,false);
+            }
+            for (var i = 0; i < mengeAReal-mengeA;i++){
+                createProduct(Auftrag,producttypes.A,true);
+            }
+            for (var i = 0; i < mengeBReal-mengeB;i++){
+                createProduct(Auftrag,producttypes.B,true);
+            }
+
             console.log("Auftrag "+ auftragsnr+" created!");
             auftragsnummer++;
             callback(null,{
                 statusCode: opcua.StatusCodes.Good,
                 outputArguments:[]
             });
+        })
+//****** JS-Methode zur Produkterstellung  von Produkten
+
+        function createProduct(Auftrag,produkttyp,productForContinuedProduction){
+            var produktnr = produktnummer;
+            var Produkt = AssetType.instantiate({
+                browseName:"Produkt",
+                nodeId:"ns=2;s=Produkt"+produktnr,
+                organizedBy: Auftrag.getComponentByName("Body").getComponentByName("Zugehoerige Produkte")
+            });
+            var ProduktType = addressSpace.addVariable({
+                browseName: "ProduktTyp",
+                componentOf: Produkt.getComponentByName("Header"),
+                dataType:"String",
+                value:{
+                    get: function(){
+                        return new opcua.Variant({dataType:"String", value: produkttyp})
+                    }
+                }
+            });
+            var ProduktNummer = addressSpace.addVariable({
+                browseName: "Produktnummer",
+                dataType:"Int32",
+                componentOf:Produkt.getComponentByName("Header"),
+                value:{
+                    get: function(){
+                        return new opcua.Variant({dataType:"Int32",value: produktnr})
+                    }
+                }
+            });
+
+            var ProductLifecycle = addressSpace.addFolder(Produkt.getComponentByName("Body"),{
+                browseName: "ProductLifecycle"
+            });
+
+            var Creation = addressSpace.addObject({
+                componentOf: ProductLifecycle,
+                browseName: "Creation"
+            });
+
+            var numberInSequenceCreation = addressSpace.addVariable({
+                browseName: "numberInSequence",
+                propertyOf: Creation,
+                dataType: "Int32",
+                value: {
+                    get: function(){
+                        return new opcua.Variant({dataType: "Int32", value: 1});
+                    }
+                }
+            })
+            if (produkttyp != producttypes.C){
+                var requiredCapabilityCreation = addressSpace.addVariable({
+                    propertyOf: Creation,
+                    browseName: "requiredCapability",
+                    dataType: "String",
+                    value:{
+                        get: function(){
+                            return new opcua.Variant({dataType: "String",value: capabilities.PRODUCING});
+                        }
+                    }
+                });
+            }else{
+                var requiredCapabilityCreation = addressSpace.addVariable({
+                    propertyOf: Creation,
+                    browseName: "requiredCapability",
+                    dataType: "String",
+                    value:{
+                        get: function(){
+                            return new opcua.Variant({dataType: "String",value: capabilities.ASSEMBLING});
+                        }
+                    }
+                });
+            }
+            
+            var finishedCreationLocal = false;
+            var finishedCreation = addressSpace.addVariable({
+                propertyOf: Creation,
+                browseName: "finished",
+                dataType: "Boolean",
+                value:{
+                    get: function(){
+                        return new opcua.Variant({dataType: "Boolean",value: finishedCreationLocal});
+                    },
+                    set: function(variant){
+                        finishedCreationLocal = true;
+                        var finishedCreationOn = addressSpace.addVariable({
+                            propertyOf: finishedCreation,
+                            browseName: "finishedOn",
+                            dataType: "String",
+                            value: {
+                                get: function(){
+                                    return new opcua.Variant({dataType: "String",value: variant.value});
+                                }
+                            }
+                        });
+                    }
+                }
+            });
+
+            if (productForContinuedProduction && produkttyp != producttypes.C){
+                var processing = addressSpace.addObject({
+                    componentOf: ProductLifecycle,
+                    browseName: "Processing"
+                });
+                var finishedProcessingLocal = false;
+                var finishedProcessing = addressSpace.addVariable({
+                    propertyOf: processing,
+                    browseName: "finished",
+                    dataType: "Boolean",
+                    value:{
+                        get: function(){
+                            return new opcua.Variant({dataType: "Boolean",value: finishedProcessingLocal});
+                        },
+                        set: function(variant){
+                            finishedProcessingLocal = true;
+                            var finishedProcessingOn = addressSpace.addVariable({
+                                propertyOf: finishedProcessing,
+                                browseName: "finishedOn",
+                                dataType: "String",
+                                value: {
+                                    get: function(){
+                                        return new opcua.Variant({dataType: "String",value: variant.value});
+                                    }
+                                }
+                            });
+                        }
+                    }
+                });
+                var requiredCapabilityProcessing = addressSpace.addVariable({
+                    dataType: "String",
+                    propertyOf: processing,
+                    browseName: "requiredCapability",
+                    value:{
+                        get: function(){
+                            return new opcua.Variant({dataType: "String",value: capabilities.ASSEMBLING});
+                        }
+                    }
+                });
+                var numberInSequenceProcessing = addressSpace.addVariable({
+                    dataType: "String",
+                    propertyOf: processing,
+                    browseName: "numberInSequence",
+                    value:{
+                        get: function(){
+                            return new opcua.Variant({dataType: "Int32",value:2});
+                        }
+                    }
         });
+            }
+            var ProduktStatus = addressSpace.addVariable({
+                componentOf: Produkt.getComponentByName("Body"),
+                browseName: "ProduktStatus",
+                dataType: "String",
+                value:{
+                    get: function(){
+                        //Check ob alle Produktionsschritte abgehakt sind.
+                        if (ProductLifecycle.getComponents().map(e => e.getPropertyByName("finished").readValue().value.value).includes(false)){
+                            return new opcua.Variant({dataType: "String", value: productstat.INPRODUCTION });
+                        }else{
+                            return new opcua.Variant({dataType: "String", value: productstat.FINISHED});
+                        }                        
+                    }
+                }
+            });
+            produktnummer++;
+        }
         
 
-//****** Methode zum Anlegen der von Geräten  */
+//****** OPCUA-Methode zum Anlegen der von Geräten  */
 
         var registerDevice = addressSpace.addMethod(Fabrik.getComponentByName("Body"),{
             modellingRule:"Mandatory",

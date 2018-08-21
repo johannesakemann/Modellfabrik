@@ -4,5 +4,6 @@
     "SHOWING"    : "Showing",
     "PROVIDEDATA": "ProvideData",
     "COLLECTING": "Collecting",
-    "DEVICEMANAGEMENT": "DeviceManagement"
+    "DEVICEMANAGEMENT": "DeviceManagement",
+    "ASSEMBLING": "Assembling"
 }
