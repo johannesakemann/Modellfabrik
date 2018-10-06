@@ -255,8 +255,6 @@ function post_initialize() {
         });
 
         ManifestPort.bindMethod(function(inputArguments,context,callback){
-            //TODO: Remove this!
-            console.log("ManifestPort calle "+inputArguments);
             var header = inputArguments[0].value;
             var type = inputArguments[1].value;
             var content = inputArguments[2].value;
@@ -1205,9 +1203,7 @@ function post_initialize() {
                 var produktsCurrAuftrag = currAuftrag.getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements();
                 var productCounter = 0;
                 //filter alle nicht fertigen Produkte
-                //TODO: REMOVE OUTPUT
                 var notFinishedProduktsCurrAuftrag = produktsCurrAuftrag.filter(p=> (p.getComponentByName("Body").getComponentByName("ProduktStatus").readValue().value.value !== productstat.FINISHED) && (p.getComponentByName("Body").getComponentByName("ProduktStatus").readValue().value.value !== productstat.INPRODUCTION));
-                console.log(notFinishedProduktsCurrAuftrag);
                 function processNotFinishedProduktsCurrAuftrag(produktIndex){
                     var produkt = notFinishedProduktsCurrAuftrag[produktIndex];
                     if (typeof produkt ===  "undefined"){
@@ -1223,8 +1219,9 @@ function post_initialize() {
                             if (response == null){
                                 //TODO: Throw some error
                             }
-                            console.log("Response ArrayIndex "+produktIndex+": "+response);
                             var productionPossible = response.outputArguments[5].value;
+                            //TODO: Remove this Output!
+                            console.log("Production of "+produkt.getComponentByName("Header").getComponentByName("Produktnummer").readValue().value.value+ " auf "+bestMachine.browseName.toString()+" possible: "+productionPossible);
                             //Wenn frei, dann platzieren der Produktion.
                             if(productionPossible){
                                 placeOrder(produkt,bestMachine, function(){
@@ -1234,9 +1231,6 @@ function post_initialize() {
                                     productCounter++;
                                     if (productCounter === notFinishedProduktsCurrAuftrag.length){
                                         //redo if all Products have been processed.
-                                        //TODO: Remove Output.
-                                        console.log("Hier");
-
                                         setTimeout(produce, 5000);
                                     }                                                                                        
                                 });
@@ -1423,7 +1417,7 @@ function post_initialize() {
             var endpointToConnect = maschine.getComponentByName("Header").getPropertyByName("Adresse").readValue().value.value;
             var plcProdukt = produkt.getComponentByName("Body").getComponentByName("ProductLifecycle").getFolderElements();
             var plcToSend = plcProdukt.map(process => process.browseName.toString());
-            console.log("Place Order von "+produkt+" auf "+maschine);
+            console.log("Place Order von "+produkt.getComponentByName("Header").getComponentByName("Produktnummer").readValue().value.value+" auf "+maschine.browseName.toString());
             var orderClient = new opcua.OPCUAClient({keepSessionAlive:true});
             var orderSession;
             var aktCap = getCurrentCapability(produkt);
@@ -1493,8 +1487,6 @@ function post_initialize() {
                             }
                         ]
                     },function(err, response){
-                        //TODO: remove this output!
-                        console.log("Callback received"+ response.outputArguments[0].value); 
                         if(!err){
                             markCurrentCapabilityAsDone(produkt, response);                        
                             callback();
@@ -1518,15 +1510,23 @@ function post_initialize() {
         //Hilfsmethodik, die den nächsten Schritt im PLC auf done setzt & den ProduktStatus wieder auf "WAITING".
         //@param: Produkt
         function markCurrentCapabilityAsDone(produkt,response){
+            var maschineFinishedOn = response.outputArguments[0].value
             produkt.getComponentByName("Body").getComponentByName("ProduktStatus").writeValue(new opcua.SessionContext({server: server}), new opcua.DataValue({value: new opcua.Variant({dataType: "String",value:productstat.READY}),statusCode: opcua.StatusCodes.Good}),function(err){});
             var aktCap = getCurrentCapability(produkt);
             var finished = aktCap.getPropertyByName("finished");
             finished.writeValue(new opcua.SessionContext({server: server}), new opcua.DataValue({value: new opcua.Variant({dataType: "Boolean",value:true}),statusCode: opcua.StatusCodes.Good}),function(err){});
-            //TODO: Remove Output.
-            console.log(aktCap.browseName.toString()+ " von Produkt"+produkt+ " ist fertig");
-            //TODO: Ergänzen um Maschinenadresse der maschine, die es hergestellt hat. --> Mglw. gar nicht nötig, da ja eh ein Link zu den Maschinen besteht? --> bei mehreren mglw alle rausslöschen ausser das ausführende.
+            console.log(aktCap.browseName.toString()+ " von Produkt"+produkt.getComponentByName("Header").getComponentByName("Produktnummer").readValue().value.value+ " ist fertig");
+            var finishedOn = addressSpace.addVariable({
+                propertyOf: finished,
+                browseName: "finishedOn",
+                dataType: "String",
+                value:{
+                    get: function(){
+                        return new opcua.Variant({dataType: "String",value: maschineFinishedOn});
+                    }
+                }
+            });
             //TODO: Evtl timestamps.
-
             //Referenz zum neuen übergeordneten Produkt
             var productNumberHigherProduct = response.outputArguments[1].value
             if (productNumberHigherProduct!= 0){
@@ -1693,8 +1693,6 @@ function post_initialize() {
             callback();
             //kurze Ausgabe
             console.log(endpointToDelete+" wurde entfernt");
-
-
         })
         removeDevice.addReference({referenceType:"OrganizedBy",nodeId:RemoveDeviceManagement})
 

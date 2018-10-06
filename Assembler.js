@@ -130,7 +130,6 @@ function post_initialize() {
                 }
             }
         });
-
         //ProduktA 
         var ProduktAProcessing = addressSpace.addObject({
             browseName: producttypes.A,
@@ -157,9 +156,6 @@ function post_initialize() {
                 }
             }
         });
-
-
-
         //ProduktB
 
         var ProduktBProcessing = addressSpace.addObject({
@@ -187,10 +183,6 @@ function post_initialize() {
                 }
             }
         });
-
-
-
-
 //****** Spezifikation der Monitoring Capability
         var ProduktCMonitoring = addressSpace.addObject({
             browseName: producttypes.C,
@@ -393,8 +385,6 @@ function post_initialize() {
         
 
         ManifestPort.bindMethod(function(inputArguments,context,callback){
-            //TODO: remove this output!
-            console.log("ManifestPort has been called "+ inputArguments);
             var header = inputArguments[0].value;
             var type = inputArguments[1].value;
             var content = inputArguments[2].value;
@@ -1458,7 +1448,6 @@ function post_initialize() {
             var productsCurrOnAssembler = Assembler.getComponentByName("Body").getFolderElements().filter(e => e.browseName.toString() === "Produkt");
             productsCurrOnAssembler.filter(p => p.getComponentByName("Header").getComponentByName("ProduktTyp").readValue().value.value === producttypes.C);
             var produktNumberToSend = productsCurrOnAssembler[0].getComponentByName("Header").getComponentByName("Produktnummer").readValue().value.value;
-            //TODO: Remove Standard Reference to AssemblerBody
             callback(null,{
                 statusCode: opcua.StatusCodes.Good,
                 outputArguments:[{
@@ -1509,7 +1498,6 @@ function post_initialize() {
             var productsCurrOnAssembler = Assembler.getComponentByName("Body").getFolderElements().filter(e => e.browseName.toString() === "Produkt");
             productsCurrOnAssembler.filter(p => p.getComponentByName("Header").getComponentByName("ProduktTyp").readValue().value.value === producttypes.C);
             var produktNumberToSend = productsCurrOnAssembler[0].getComponentByName("Header").getComponentByName("Produktnummer").readValue().value.value;
-            //TODO: Remove Standard Reference to AssemblerBody
             callback(null,{
                 statusCode: opcua.StatusCodes.Good,
                 outputArguments:[{
@@ -1551,7 +1539,7 @@ function post_initialize() {
         produceProductC.addReference({referenceType:"OrganizedBy",nodeId: ProduktC});
 
         produceProductC.bindMethod(function(inputArguments,context,callback){
-            productionRuns= true;
+            productionAvailability = false;
             var produktNummer = inputArguments[0].value;
             var productLifecycle = inputArguments[1].value;
             var currentProduct = createProduct(produktNummer, productLifecycle,producttypes.C);
@@ -1560,8 +1548,7 @@ function post_initialize() {
             Input.getFolderElements().forEach(function(p){
                 var requestClient = new opcua.OPCUAClient();
                 var requestSession;
-                var typ = p.getPropertyByName("ProduktTyp").readValue().value.value;
-                console.log("Typ "+typ);
+                var typ = p.getPropertyByName("ProduktTyp").readValue().value.value;                
                 var objectId;
                 var methodId;
 
@@ -1571,8 +1558,7 @@ function post_initialize() {
                             if(err) {
                                 console.log(" cannot connect to endpoint :" , endpointFabrik );
                                 console.log(err);
-                            }else{
-                                console.log("Connected to Fabrik!")
+                            }else{                                
                                 callback(err);
                             }
                         }); 
@@ -1580,7 +1566,6 @@ function post_initialize() {
                     function(callback) {
                         requestClient.createSession(function(err,session) {
                             if(!err) {
-                                console.log("SessionCreated")
                                 requestSession = session;
                                 callback(err);                            
                             }else{
@@ -1605,15 +1590,12 @@ function post_initialize() {
                                 }
                             ]
                         },function(err,response){
-                            console.log("Add InputRequest called!");
                             if (err){
                                 console.log("Error during register request: "+err);
                             }else{
                                 //console.log(response);
                                 methodId = response.outputArguments[3].value;
                                 objectId = response.outputArguments[4].value;
-                                console.log("RegisterMethodId: "+methodId);
-                                console.log("RegisterObjectId: "+objectId);
                             }
                             callback(err);
                         });
@@ -1664,6 +1646,7 @@ function post_initialize() {
                         });
                         console.log("Production of Product "+currentProduct.getComponentByName("Header").getComponentByName("Produktnummer").readValue().value.value+" finished");
                         addressSpace.deleteNode(currentProduct);
+                        productionAvailability = true;
                     }, TimeToManufacture.readValue().value.value*1000);   
                 }else{
                     setTimeout(checkForInput,2000);
