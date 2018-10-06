@@ -139,7 +139,25 @@ function post_initialize() {
         var RemoveDeviceManagement = addressSpace.addObject({
             browseName: msgspec.Content.DeviceManagement.REMOVE,
             componentOf: DeviceManagement
-        })
+        });
+//****** Anlegen der AddInputProduct Capability
+
+        var AddInputProduct = addressSpace.addObject({
+            browseName: capabilities.ADDINPUTPRODUCT,
+            organizedBy: Capabilities
+        });
+        var AddInputProductA = addressSpace.addObject({
+            browseName: msgspec.Content.AddInputProduct.A,
+            componentOf: AddInputProduct
+        });
+        var AddInputProductB = addressSpace.addObject({
+            browseName: msgspec.Content.AddInputProduct.B,
+            componentOf: AddInputProduct
+        });
+        var AddInputProductC = addressSpace.addObject({
+            browseName: msgspec.Content.AddInputProduct.C,
+            componentOf: AddInputProduct
+        });
 //****** Anlegen Collecting Capability */
         var Collecting = addressSpace.addObject({
             browseName: capabilities.COLLECTING,
@@ -237,6 +255,8 @@ function post_initialize() {
         });
 
         ManifestPort.bindMethod(function(inputArguments,context,callback){
+            //TODO: Remove this!
+            console.log("ManifestPort calle "+inputArguments);
             var header = inputArguments[0].value;
             var type = inputArguments[1].value;
             var content = inputArguments[2].value;
@@ -426,11 +446,11 @@ function post_initialize() {
                 set: function(variant){
                     if (variant.value === true){
                         if(getCurrentAuftrag()==="NoCurrentAuftrag"){
-                            var waitingAuftraege = Auftragsordner.getFolderElements().filter(auftrag => auftrag.getComponentByName("Header").getComponentByName("Auftragsstatus").readValue().value.value === auftragsstat.WAITING);
-                            if(waitingAuftraege.length >0){
+                            var readyAuftraege = Auftragsordner.getFolderElements().filter(auftrag => auftrag.getComponentByName("Header").getComponentByName("Auftragsstatus").readValue().value.value === auftragsstat.READY);
+                            if(readyAuftraege.length > 0){
                                 async.series([
                                     function(callback){                                    
-                                        waitingAuftraege[0].getComponentByName("Header").getComponentByName("Auftragsstatus").writeValue(new opcua.SessionContext({server: server}), new opcua.DataValue({value: new opcua.Variant({dataType: "String",value:auftragsstat.INPRODUCTION}),statusCode: opcua.StatusCodes.Good}),function(err){
+                                        readyAuftraege[0].getComponentByName("Header").getComponentByName("Auftragsstatus").writeValue(new opcua.SessionContext({server: server}), new opcua.DataValue({value: new opcua.Variant({dataType: "String",value:auftragsstat.INPRODUCTION}),statusCode: opcua.StatusCodes.Good}),function(err){
                                             if(!err){
                                                 console.log("Next Auftrag Chosen!" +getCurrentAuftrag());
                                                 auftragFinished = false;
@@ -447,7 +467,7 @@ function post_initialize() {
                                         var mengeC = currAuftragBody.getComponentByName("BerechneteMengeC").readValue().value;                                    
                                         startProduction.execute([mengeA,mengeB,mengeC],new opcua.SessionContext(),function(err,result){
                                             if(!err){
-                                                console.log("Starte Produktion!!!");
+                                                //console.log("Starte Produktion!!!");
                                             }
                                         });
                                         callback();   
@@ -468,7 +488,7 @@ function post_initialize() {
                             var mengeCVariant = new opcua.Variant({dataType: "Int32",value: mengeC});
                             startProduction.execute([mengeAVariant,mengeBVariant,mengeCVariant],new opcua.SessionContext(),function(err,result){
                                 if(!err){
-                                    console.log("Starte Produktion!!!");
+                                    //console.log("Starte Produktion!!!");
                                 }
                             });
                             productionRuns = variant.value;
@@ -677,38 +697,50 @@ function post_initialize() {
                 }
             });
 
-            var Auftragsstatus = addressSpace.addVariable({
-                componentOf: Auftrag.getComponentByName("Header"),
-                dataType: "String",
-                browseName: "Auftragsstatus",
-                value:{
-                    get: function(){
-                        return new opcua.Variant({dataType: "String", value:auftragsstatus});
-                    },
-                    set: function(variant){
-                        auftragsstatus = variant.value;
-                        return opcua.StatusCodes.Good;
-                    }
-                }
-            });
-
             var AuftragProduktordner = addressSpace.addObject({
                 componentOf:Auftrag.getComponentByName("Body"),
                 browseName: "Zugehoerige Produkte",
                 typeDefinition: folderType
             })
 
+
             //Anlegen der entsprechenden Produkte
 
             for (var i = 0; i < mengeA;i++){
-                createProduct(Auftrag,producttypes.A);
+                createProduct(Auftrag,producttypes.A,[capabilities.PRODUCING]);
             }
             for (var i = 0; i < mengeB;i++){
-                createProduct(Auftrag,producttypes.B);
+                createProduct(Auftrag,producttypes.B,[capabilities.PRODUCING]);
             }
             for (var i = 0; i < mengeC;i++){
-                createProduct(Auftrag,producttypes.C);
+                createProduct(Auftrag,producttypes.C,[capabilities.PRODUCING]);
             }
+            var Auftragsstatus = addressSpace.addVariable({
+                componentOf: Auftrag.getComponentByName("Header"),
+                dataType: "String",
+                browseName: "Auftragsstatus",
+                value:{
+                    get: function(){
+                        var productsArray = AuftragProduktordner.getFolderElements();
+                        var productsStatusArray = productsArray.map(p => p.getComponentByName("Body").getComponentByName("ProduktStatus").readValue().value.value);
+                        if(productsStatusArray.every(s => s === productstat.FINISHED)){                            
+                            auftragsstatus = auftragsstat.FINISHED;
+                        }else if (productsStatusArray.includes(productstat.WAITING)){
+                            auftragsstatus = auftragsstat.WAITING;
+                        }else if(productsStatusArray.every(e=> e === productstat.FINISHED || e === productstat.READY) && auftragsstatus!== auftragsstat.INPRODUCTION){
+                            auftragsstatus = auftragsstat.READY;
+                        }
+                        return new opcua.Variant({dataType: "String", value:auftragsstatus});
+                    },
+                    set: function(variant){ 
+                        if (auftragsstatus === auftragsstat.READY){
+                            auftragsstatus = variant.value;
+                        }
+                        return opcua.StatusCodes.Good;
+                    }
+                }
+            });
+
             console.log("Auftrag "+ auftragsnr+" created!");
             auftragsnummer++;
             callback(null,{
@@ -718,7 +750,7 @@ function post_initialize() {
         });
 //****** JS-Methode zur Produkterstellung
 
-        function createProduct(Auftrag,produkttyp){
+        function createProduct(Auftrag,produkttyp,plc){
             var produktnr = produktnummer;
             var Produkt = AssetType.instantiate({
                 browseName:"Produkt",
@@ -746,51 +778,43 @@ function post_initialize() {
                 }
             });
 
-            var ProductLifecycle = addressSpace.addFolder(Produkt.getComponentByName("Body"),{
-                browseName: "ProductLifecycle"
+            var ProductLifecycle = addressSpace.addObject({
+                browseName: "ProductLifecycle",
+                componentOf: Produkt.getComponentByName("Body"),
+                typeDefinition: folderType
             });
-
-            var ProductionProduct = addressSpace.addObject({
-                componentOf: ProductLifecycle,
-                browseName: capabilities.PRODUCING
-            });
-
-            var numberInSequenceCreation = addressSpace.addVariable({
-                browseName: "numberInSequence",
-                propertyOf: ProductionProduct,
-                dataType: "Int32",
-                value: {
-                    get: function(){
-                        return new opcua.Variant({dataType: "Int32", value: 1});
+            plc.forEach(function(process){
+                var ProcessProduct = addressSpace.addObject({
+                   componentOf: ProductLifecycle,
+                   browseName: process
+               });
+               
+                var numberInSequenceProcess = addressSpace.addVariable({
+                    browseName: "numberInSequence",
+                    propertyOf: ProcessProduct,
+                    dataType: "Int32",
+                    value: {
+                        get: function(){
+                            return new opcua.Variant({dataType: "Int32", value: plc.indexOf(process)+1});
+                        }
                     }
-                }
-            })
-            
-            var finishedProductionProductLocal = false;
-            var finishedProductionProduct = addressSpace.addVariable({
-                propertyOf: ProductionProduct,
-                browseName: "finished",
-                dataType: "Boolean",
-                value:{
-                    get: function(){
-                        return new opcua.Variant({dataType: "Boolean",value: finishedProductionProductLocal});
-                    },
-                    set: function(variant){
-                        finishedProductionProductLocal = true;
-                        var finishedProductionProductOn = addressSpace.addVariable({
-                            propertyOf: finishedProductionProduct,
-                            browseName: "finishedOn",
-                            dataType: "String",
-                            value: {
-                                get: function(){
-                                    return new opcua.Variant({dataType: "String",value: variant.value});
-                                }
-                            }
-                        });
+                });
+                var finishedProcessProductLocal = false;
+                var finishedProcessProduct = addressSpace.addVariable({
+                    propertyOf: ProcessProduct,
+                    browseName: "finished",
+                    dataType: "Boolean",
+                    value:{
+                        get: function(){
+                            return new opcua.Variant({dataType: "Boolean",value: finishedProcessProductLocal});
+                        },
+                        set: function(variant){
+                            finishedProcessProductLocal = variant.value;                        
+                        }
                     }
-                }
+                });
             });
-
+            var produktStatus = productstat.READY;
             var ProduktStatus = addressSpace.addVariable({
                 componentOf: Produkt.getComponentByName("Body"),
                 browseName: "ProduktStatus",
@@ -799,16 +823,54 @@ function post_initialize() {
                     get: function(){
                         //Check ob alle Produktionsschritte abgehakt sind.
                         if (ProductLifecycle.getComponents().map(e => e.getPropertyByName("finished").readValue().value.value).includes(false)){
-                            return new opcua.Variant({dataType: "String", value: productstat.INPRODUCTION });
+                            var capArray = ProductLifecycle.getComponents();
+                            var capArrayNotFinished = capArray.filter(c => c.getPropertyByName("finished").readValue().value.value == false);
+                            var capsExecutable = true;
+                            capArrayNotFinished.forEach(function(c){
+                                if (c.findReferences("Organizes",true).length === 0){
+                                    capsExecutable = false;
+                                }
+                            });
+                            if (capsExecutable){
+                                return new opcua.Variant({dataType: "String",value: produktStatus})
+                            }else{
+                                return new opcua.Variant({dataType: "String", value: productstat.WAITING });    
+                            }
                         }else{
                             return new opcua.Variant({dataType: "String", value: productstat.FINISHED});
                         }                        
+                    },
+                    set: function(variant){
+                        //TODO:Limit Inputs to valid productstatus
+                        produktStatus = variant.value;
+                        return opcua.StatusCodes.Good
                     }
                 }
             });
+            //Link zwischen Produkten und Maschinen
+            Geraeteordner.getFolderElements().forEach(function(device){
+                linkProductToMaschine(Produkt,device);
+            })
             produktnummer++;
+            return Produkt;
         }
-
+//****** JS-Methode um den Link zwischen den geforderten Fähigkeiten der eines Produkte und den einer Maschine herzustellen, welche diese Fähigkeit besitzt */
+        
+        function linkProductToMaschine (product, maschine){
+            var typ = product.getComponentByName("Header").getComponentByName("ProduktTyp").readValue().value.value;
+            var plcFolder = product.getComponentByName("Body").getComponentByName("ProductLifecycle");
+            var capArray = plcFolder.getComponents();
+            capArray.forEach(function(cap){
+                var capName = cap.browseName.toString();
+                var capMaschineArray = maschine.getComponentByName("Manifest").getComponentByName("Capabilities").getFolderElements();
+                if(capMaschineArray.map(c=>c.browseName.toString()).includes(capName)){
+                    var matchingCap = capMaschineArray.filter(c =>c.browseName.toString() === capName)[0];
+                    if(matchingCap.getFolderElements().map(pt => pt.browseName.toString()).includes(typ)){
+                        cap.addReference({referenceType: "Organizes",nodeId: maschine});
+                    }
+                }
+            })
+        }
 
 //****** OPCUA-Methode zum Anlegen der von Geräten  */
 
@@ -842,6 +904,11 @@ function post_initialize() {
                 dataType: opcua.DataType.String,
                 arrayType: opcua.VariantArrayType.Array,
                 valueRank: 1
+            },{
+                name:"Processing",
+                dataType: opcua.DataType.String,
+                arrayType: opcua.VariantArrayType.Array,
+                valueRank: 1
             }],
             outputArguments: []
 
@@ -855,6 +922,7 @@ function post_initialize() {
             var producing = inputArguments[4].value;
             var showing = inputArguments[5].value;
             var monitoring = inputArguments[6].value;
+            var processing = inputArguments[7].value;
             
             var Machine = AssetType.instantiate({
                 browseName: endpointType.value,
@@ -917,13 +985,31 @@ function post_initialize() {
                 componentOf: ManifestMachine,
                 typeDefinition: folderType
             });
+
             endpointMachine.addReference({referenceType:"OrganizedBy",nodeId:IdentificationMachine});
             serialNumberMachine.addReference({referenceType:"OrganizedBy",nodeId:IdentificationMachine});
 
+
+        
             if(producing.length > 0){
                 var ProducingMachine = addressSpace.addObject({
                     browseName: capabilities.PRODUCING,
                     organizedBy: CapabilitiesMachine
+                });
+                var productionRunsDeviceLocal = false;
+                var productionRunsDevice = addressSpace.addVariable({
+                    browseName: "ProductionRuns",
+                    componentOf: ProducingMachine,
+                    dataType: "Boolean",
+                    value:{
+                        get: function(){
+                            return new opcua.Variant({dataType: "Boolean",value:productionRunsDeviceLocal})
+                        },
+                        set: function(value){
+                            productionRunsDeviceLocal = value.value;
+                            return opcua.StatusCodes.Good;
+                        }
+                    }
                 });
                 if(Capabilities.getFolderElements().filter(element => element.browseName.toString() === capabilities.PRODUCING).length === 0 ){
                     var Producing = addressSpace.addObject({
@@ -1011,6 +1097,68 @@ function post_initialize() {
                 Machine.addReference({referenceType: "OrganizedBy", nodeId: Capabilities.getFolderElements().filter(element => element.browseName.toString() === capabilities.MONITORING)[0].getComponentByName(cap)});
             });
 
+            if(processing.length > 0){
+                var ProcessingMachine = addressSpace.addObject({
+                    browseName: capabilities.PROCESSING,
+                    organizedBy: CapabilitiesMachine
+                });
+                var processingRunsDeviceLocal = false;
+                var processingRunsDevice = addressSpace.addVariable({
+                    browseName: "ProcessingRuns",
+                    componentOf: ProcessingMachine,
+                    dataType: "Boolean",
+                    value:{
+                        get: function(){
+                            return new opcua.Variant({dataType: "Boolean",value:processingRunsDeviceLocal})
+                        },
+                        set: function(value){
+                            processingRunsDeviceLocal = value.value;
+                            return opcua.StatusCodes.Good;
+                        }
+                    }
+                });
+                if(Capabilities.getFolderElements().filter(element => element.browseName.toString() === capabilities.PROCESSING).length === 0 ){
+                    var Processing = addressSpace.addObject({
+                        browseName: capabilities.PROCESSING,
+                        organizedBy: Capabilities
+                    });
+                }
+            }
+             
+            processing.forEach(function(cap){
+                var ProcPossMachine = addressSpace.addObject({
+                    browseName: cap,
+                    organizedBy: Machine.getComponentByName("Manifest").getComponentByName("Capabilities").getFolderElements().filter(e => e.browseName.toString() === capabilities.PROCESSING)[0]
+                });
+                var ProdPossMachineProductType =addressSpace.addVariable({
+                    componentOf: ProcPossMachine,
+                    browseName: "ProduktTyp",
+                    dataType: "String",
+                    value: {
+                        get: function(){
+                            return new opcua.Variant({dataType: "String",value: cap});
+                        }
+                    }
+                })
+
+                if (Capabilities.getFolderElements().filter(element => element.browseName.toString() === capabilities.PROCESSING)[0].getComponentByName(cap) === null){
+                    var ProcPoss = addressSpace.addObject({
+                        browseName: cap,
+                        componentOf: Capabilities.getFolderElements().filter(element => element.browseName.toString() === capabilities.PROCESSING)[0]
+                    });
+                }
+                Machine.addReference({referenceType: "OrganizedBy", nodeId: Capabilities.getFolderElements().filter(element => element.browseName.toString() === capabilities.PROCESSING)[0].getComponentByName(cap)});
+            });
+
+
+            //Link zu Produkten
+            Auftragsordner.getFolderElements().forEach(function(auftrag){
+                var productfolder = auftrag.getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements();
+                productfolder.forEach(function(p){
+                    linkProductToMaschine(p,Machine);
+                });
+            })
+
             callback();
         });
 
@@ -1032,6 +1180,7 @@ function post_initialize() {
 //****** JS-Funktion um die Produktion anzuschieben */
 
         var startProduction = addressSpace.addMethod(Fabrik.getComponentByName("Body"),{
+            //TODO: Remove the inputArguments --> Check all MethodCalls!
             browseName: "startProduction",
             modellingRule: "Mandatory",
             inputArguments:[
@@ -1048,90 +1197,161 @@ function post_initialize() {
             ],
             outputArguments:[]
         })
-        startProduction.bindMethod(function(inputArguments,context,cb){
-            var auftrag = addressSpace.findNode(getCurrentAuftrag());
-            var mengeA = inputArguments[0].value;
-            var mengeB = inputArguments[1].value;
-            var mengeC = inputArguments[2].value;
-            var prodData = {}
-            var producing = Capabilities.getFolderElements().filter(e => e.browseName.toString() === msgspec.Type.PRODUCING)[0];
-            var mengenObj = {};
-            
-            if (mengeA > 0){
-                prodData[producttypes.A] = {}
-                producing.getComponentByName(producttypes.A).getFolderElements().forEach(function(geraet){
-                    var adresse = geraet.getComponentByName("Manifest").getComponentByName("Identification").getFolderElements().filter(element => element.browseName.toString() === "Adresse")[0].readValue().value.value;
-                    var timeToManufacture = geraet.getComponentByName("Manifest").getComponentByName("Capabilities").getFolderElements().filter(e => e.browseName.toString() === msgspec.Type.PRODUCING)[0].getFolderElements().filter(e => e.browseName.toString() === producttypes.A)[0].getPropertyByName("TimeToManufacture").readValue().value.value;
-                    prodData[producttypes.A][adresse] = timeToManufacture;
-                });
-            }
+        startProduction.bindMethod(function(inputArguments,context,callback){
 
-            if (mengeB > 0){
-                prodData[producttypes.B] = {}
-                producing.getComponentByName(producttypes.B).getFolderElements().forEach(function(geraet){
-                    var adresse = geraet.getComponentByName("Manifest").getComponentByName("Identification").getFolderElements().filter(element => element.browseName.toString() === "Adresse")[0].readValue().value.value;
-                    var timeToManufacture = geraet.getComponentByName("Manifest").getComponentByName("Capabilities").getFolderElements().filter(e => e.browseName.toString() === msgspec.Type.PRODUCING)[0].getFolderElements().filter(e => e.browseName.toString() === producttypes.B)[0].getPropertyByName("TimeToManufacture").readValue().value.value;
-                    prodData[producttypes.B][adresse] = timeToManufacture;
-                });
-            }
-            if (mengeC > 0){
-                prodData[producttypes.C] = {}
-                producing.getComponentByName(producttypes.C).getFolderElements().forEach(function(geraet){
-                    var adresse = geraet.getComponentByName("Manifest").getComponentByName("Identification").getFolderElements().filter(element => element.browseName.toString() === "Adresse")[0].readValue().value.value;
-                    var timeToManufacture = geraet.getComponentByName("Manifest").getComponentByName("Capabilities").getFolderElements().filter(e => e.browseName.toString() === msgspec.Type.PRODUCING)[0].getFolderElements().filter(e => e.browseName.toString() === producttypes.C)[0].getPropertyByName("TimeToManufacture").readValue().value.value;
-                    prodData[producttypes.C][adresse] = timeToManufacture;
-                });
-            }
-            var bestProduction = {};
-            //Beachtung der Produkte die nur auf einer Maschine hergestellt werden können.
-            for (var product in prodData){
-                if (prodData.hasOwnProperty(product)){
-                    if (Object.keys(product).length === 1){
-                        bestProduction[product] = prodData[prodData];
-                    }
-                }
-            }
+            var currAuftrag = addressSpace.findNode(getCurrentAuftrag());
             
-            for (var product in prodData){
-                if(!bestProduction.hasOwnProperty(product)){
-                    var minTime = Number.MAX_VALUE;
-                    var minGeraet;
-                    for(var geraet in prodData[product]){
-                        if(minTime>prodData[product][geraet]){
-                            minTime = prodData[product][geraet];
-                            minGeraet = geraet;
+            function produce(){
+                var produktsCurrAuftrag = currAuftrag.getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements();
+                var productCounter = 0;
+                //filter alle nicht fertigen Produkte
+                //TODO: REMOVE OUTPUT
+                var notFinishedProduktsCurrAuftrag = produktsCurrAuftrag.filter(p=> (p.getComponentByName("Body").getComponentByName("ProduktStatus").readValue().value.value !== productstat.FINISHED) && (p.getComponentByName("Body").getComponentByName("ProduktStatus").readValue().value.value !== productstat.INPRODUCTION));
+                console.log(notFinishedProduktsCurrAuftrag);
+                function processNotFinishedProduktsCurrAuftrag(produktIndex){
+                    var produkt = notFinishedProduktsCurrAuftrag[produktIndex];
+                    if (typeof produkt ===  "undefined"){
+                        return;
+                    }
+                    getBestMaschineCurrentCap(produkt,function(bestMachine){
+                        if(bestMachine === 0){
+                            //TODO: Throw some error
+                            return;
                         }
-                    }
-                    bestProduction[product] = minGeraet;
-                }    
-            }
-            function getZielAdresse(){
-                if (mengeC >0 ){
-                    return bestProduction[producttypes.C]
-                }else{
-                    return server.endpoints[0].endpointDescriptions()[0].endpointUrl;
+                        // Anfrage an Maschine ob frei
+                        requestProduction(produkt, bestMachine,function(response){
+                            if (response == null){
+                                //TODO: Throw some error
+                            }
+                            console.log("Response ArrayIndex "+produktIndex+": "+response);
+                            var productionPossible = response.outputArguments[5].value;
+                            //Wenn frei, dann platzieren der Produktion.
+                            if(productionPossible){
+                                placeOrder(produkt,bestMachine, function(){
+                                    if (produktIndex !== notFinishedProduktsCurrAuftrag.length-1){
+                                        processNotFinishedProduktsCurrAuftrag(produktIndex+1);
+                                    }
+                                    productCounter++;
+                                    if (productCounter === notFinishedProduktsCurrAuftrag.length){
+                                        //redo if all Products have been processed.
+                                        //TODO: Remove Output.
+                                        console.log("Hier");
+
+                                        setTimeout(produce, 5000);
+                                    }                                                                                        
+                                });
+                            }else{
+                                if (produktIndex !== notFinishedProduktsCurrAuftrag.length-1){
+                                    processNotFinishedProduktsCurrAuftrag(produktIndex+1);
+                                }
+                                productCounter++;
+                                if (productCounter === notFinishedProduktsCurrAuftrag.length){
+                                    //redo if all Products have been processed. 
+                                    setTimeout(produce, 4000);
+                                }                        
+                            }                      
+                        });
+                    })
+                }
+                if (notFinishedProduktsCurrAuftrag.length >= 1){
+                    processNotFinishedProduktsCurrAuftrag(0);
+                }else if(currAuftrag.getComponentByName("Header").getComponentByName("Auftragsstatus").readValue().value.value === auftragsstat.INPRODUCTION){
+                    setTimeout(produce,5000);
                 }
             }
-            mengenObj[producttypes.A] = mengeA;
-            mengenObj[producttypes.B] = mengeB;
-            mengenObj[producttypes.C] = mengeC;
+            produce();
+        });
+        //Hilfsfunktion, die zu einem Produkt die aktuelle Capability zurückgibt
+        //@param: produkt
+        //@return: capability
+        function getCurrentCapability(produkt){
+            //console.log("Product to determine currentCap: "+produkt);
+            var capArray = produkt.getComponentByName("Body").getComponentByName("ProductLifecycle").getComponents();
+            var notFinishedCaps = capArray.filter(cap => cap.getPropertyByName("finished").readValue().value.value === false);
+            var currCap = notFinishedCaps[0];
+            if(notFinishedCaps.length > 1){
+                notFinishedCaps.forEach(function(cap){
+                    var numberInSequenceCap = cap.getPropertyByName("numberInSequence").readValue().value.value;
+                    var numberInSequenceAktCap = currCap.getPropertyByName("numberInSequence").readValue().value.value;
+                    if(numberInSequenceCap<numberInSequenceAktCap){
+                        currCap = cap;
+                    }
+                });
+            }
+            return currCap;
+        }
 
-            console.log(bestProduction);
-            var productArray = Object.keys(bestProduction);
-            var baseproductsArray = productArray.filter(e => e === producttypes.A || e === producttypes.B);
-            console.log(baseproductsArray);
-            baseproductsArray.forEach(function(element){
-                console.log(element);
-                console.log(bestProduction[element]);
-                var theSession;
-                var methodIdPr;
-                var objectIdPr;
-                var productClient = new opcua.OPCUAClient();
+        //Hilfsfunktion die alle (nicht-fertigen)Produkte (aus aktuellem Auftrag) als Array zurückgibt die eine Maschine (Parameter) als beste Möglichkeit für ihre nächste Capability haben.
+        //@param: machine
+        //@return: [produkt]
+
+        function getCorrespondingProducts(machine,fn){
+            var result = [];
+            if (getCurrentAuftrag() === "NoCurrentAuftrag"){
+                fn(result);
+                return; 
+            }
+            var currAuftrag = addressSpace.findNode(getCurrentAuftrag());
+            var produktsCurrAuftrag = currAuftrag.getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements();
+            //filter alle nicht fertigen Produkte
+            var notFinishedProduktsCurrAuftrag = produktsCurrAuftrag.filter(p=> (p.getComponentByName("Body").getComponentByName("ProduktStatus").readValue().value.value) !== productstat.FINISHED);
+            var produktsCounter = 0;
+            notFinishedProduktsCurrAuftrag.forEach(function(produkt){
+                var aktCap = getCurrentCapability(produkt);
+                var availableMachinesforCap = aktCap.getFolderElements();
+                //rausschmeißen der Produkte bei denen die maschine nicht auf der aktuellen Capability als Möglichkeit zur Verfügung steht.
+                if (!availableMachinesforCap.map(m =>m.nodeId.toString()).includes(machine.nodeId.toString())){
+                    return;
+                }
+                getBestMaschineCurrentCap(produkt,function(bestMaschineCurrentCap){
+                    //console.log("bestMachineCurrentCap: "+bestMaschineCurrentCap);
+                    if(bestMaschineCurrentCap === 0){
+                       //TODO: Statusänderung des Produktes wenn es keine Maschinen gibt, die die Capability bearbeiten könnens 
+                    }
+                    if (bestMaschineCurrentCap.nodeId.toString() === machine.nodeId.toString()){
+                        result.push(produkt);
+                    }
+                    produktsCounter++;
+                    if(produktsCounter === notFinishedProduktsCurrAuftrag.length){
+                        fn(result);
+                    }
+                });
+            });
+        }
+
+
+        //Hilfsmethode die die beste Maschine für die aktuelle Capability eines Produktes zurückgibt
+        //@param produkt
+        //@return maschine
+
+        function getBestMaschineCurrentCap(produkt, fn){
+            var aktCap = getCurrentCapability(produkt);
+            var availableMachinesforCap = aktCap.getFolderElements();
+            //console.log(availableMachinesforCap);
+            var counterMachines =0;
+            //TODO: Statusänderung des Produktes wenn es keine Maschinen gibt, die die Capability bearbeiten können
+            if (availableMachinesforCap.length === 0){
+                fn(0);
+                return;
+            }
+            if (availableMachinesforCap.length === 1){
+                fn(availableMachinesforCap[0]);
+                return;
+            }
+            
+            var bestMachineforCap = availableMachinesforCap[0];
+            var bestMachineProdTime = Number.MAX_VALUE;            
+            availableMachinesforCap.forEach(function(machine){
+                var currMachineEndpoint = machine.getComponentByName("Header").getPropertyByName("Adresse").readValue().value.value;                    
+                var currMachineTime;
+                var requestsession;
+                var requestClient = new opcua.OPCUAClient();
+                //Abfrage der TimeToManufacture des aktuellen Produktes
                 async.series([
                     function(callback){
-                        productClient.connect(bestProduction[element],function(err){
+                        requestClient.connect(currMachineEndpoint,function(err){
                             if(!err){
-                                console.log("Connected to "+bestProduction[element]);
+                                //console.log("Connected to "+bestProduction[element]);
                                 callback();
                             }else{
                                 console.log(err);
@@ -1139,10 +1359,9 @@ function post_initialize() {
                         })
                     },
                     function(callback){
-                        productClient.createSession(function(err,session){
-                            if(!err){
-                                console.log("Session created");
-                                theSession = session
+                        requestClient.createSession(function(err,session){
+                            if(!err){                                        
+                                requestsession = session
                                 callback();
                             }else{
                                 console.log(err);
@@ -1150,83 +1369,239 @@ function post_initialize() {
                         })
                     },
                     function(callback){
-                        theSession.call({
+                        requestsession.call({
                             objectId: "ns=2;s=Manifest",
                             methodId: "ns=2;s=ManifestPort",
                             inputArguments:[{
                                 name: "Header",
                                 dataType: "String",
-                                value: msgspec.Header.ORDER
+                                value: msgspec.Header.REQUEST
                             },{
                                 name: "Type",
                                 dataType: "String",
-                                value: msgspec.Type.PRODUCING
+                                value: aktCap.browseName.toString()
                             },{
                                 name: "Content",
                                 dataType: "String",
-                                value: element
+                                value: produkt.getComponentByName("Header").getComponentByName("ProduktTyp").readValue().value.value
                             }]
                         },function(err,result){
-                            if(!err){                            
-                                methodIdPr = result.outputArguments[3].value;
-                                objectIdPr = result.outputArguments[4].value;                                
+                            if(!err){
+                                currMachineTime = result.outputArguments[0].value;
+                                counterMachines++;
+                                //console.log("Zeit von "+currMachineEndpoint+": "+currMachineTime);
+                                if (currMachineTime < bestMachineProdTime){
+                                    bestMachineforCap = machine;
+                                    bestMachineProdTime = currMachineTime;
+                                }
+                                //console.log("counterMachines: "+counterMachines);
+                                if (counterMachines === availableMachinesforCap.length){
+                                    fn(bestMachineforCap);
+                                }
                                 callback();
                             }
                         });
                     },
                     function(callback){
-                        theSession.call({
-                            objectId: objectIdPr,
-                            methodId: methodIdPr,
-                            inputArguments:[{
-                                name: "VolumeA",
+                        requestsession.close(function(err){
+                            if (err){
+                                console.log(err);
+                            }
+                        });
+                        requestClient.disconnect();
+                        callback();
+                    }
+                ]);
+            });
+        }
+
+        //Hilfsmethode um ein Produkt auf gewisser Maschine zu ordern
+        //@param: produkt, maschine
+
+        function placeOrder(produkt, maschine, fn){
+            produkt.getComponentByName("Body").getComponentByName("ProduktStatus").writeValue(new opcua.SessionContext({server: server}), new opcua.DataValue({value: new opcua.Variant({dataType: "String",value:productstat.INPRODUCTION}),statusCode: opcua.StatusCodes.Good}),function(err){});
+            var endpointToConnect = maschine.getComponentByName("Header").getPropertyByName("Adresse").readValue().value.value;
+            var plcProdukt = produkt.getComponentByName("Body").getComponentByName("ProductLifecycle").getFolderElements();
+            var plcToSend = plcProdukt.map(process => process.browseName.toString());
+            console.log("Place Order von "+produkt+" auf "+maschine);
+            var orderClient = new opcua.OPCUAClient({keepSessionAlive:true});
+            var orderSession;
+            var aktCap = getCurrentCapability(produkt);
+            var objectId;
+            var methodId;
+            async.series([
+                function(callback){
+                    orderClient.connect(endpointToConnect,function(err){
+                        if(!err){
+                            //console.log("Connected to "+bestProduction[element]);
+                            callback();
+                        }else{
+                            console.log(err);
+                        }
+                    })
+                },
+                function(callback){
+                    orderClient.createSession(function(err,session){
+                        if(!err){                                        
+                            orderSession = session;
+                            callback();
+                        }else{
+                            console.log(err);
+                        }
+                    })
+                },
+                function(callback){
+                    orderSession.call({
+                        objectId: "ns=2;s=Manifest",
+                        methodId: "ns=2;s=ManifestPort",
+                        inputArguments:[{
+                            name: "Header",
+                            dataType: "String",
+                            value: msgspec.Header.ORDER
+                        },{
+                            name: "Type",
+                            dataType: "String",
+                            value: aktCap.browseName.toString()
+                        },{
+                            name: "Content",
+                            dataType: "String",
+                            value: produkt.getComponentByName("Header").getComponentByName("ProduktTyp").readValue().value.value
+                        }]
+                    },function(err,result){
+                        if(!err){
+                            //console.log(result);
+                            methodId = result.outputArguments[3].value;
+                            objectId = result.outputArguments[4].value;
+                            callback();
+                        }
+                    });
+                },
+                function(callback){
+                    fn();
+                    orderSession.call({
+                        objectId: objectId,
+                        methodId: methodId,
+                        inputArguments:[
+                            {
                                 dataType: "Int32",
-                                value: mengenObj[element]
+                                value: produkt.getComponentByName("Header").getComponentByName("Produktnummer").readValue().value.value
                             },{
-                                name: "AdresseZiel",
+                                arrayType: opcua.VariantArrayType.Array,
+                                valueRank:1,
                                 dataType: "String",
-                                value : getZielAdresse()
-                            },{
-                                name: "Auftraggeber",
-                                dataType: "String",
-                                value: addressSpace.findNode(getCurrentAuftrag()).getComponentByName("Header").getComponentByName("Auftraggeber").readValue().value.value
-                            },{
-                                name: "Auftragsnummer",
-                                dataType: "Int32",
-                                value: addressSpace.findNode(getCurrentAuftrag()).getComponentByName("Header").getComponentByName("Auftragsnummer").readValue().value.value
-                            },{
-                                name: "BestellmengeA",
-                                dataType: "Int32",
-                                value: addressSpace.findNode(getCurrentAuftrag()).getComponentByName("Body").getComponentByName("BestellmengeA").readValue().value.value
-                            },{
-                                name: "BestellmengeB",
-                                dataType: "Int32",
-                                value: addressSpace.findNode(getCurrentAuftrag()).getComponentByName("Body").getComponentByName("BestellmengeB").readValue().value.value
-                            },{
-                                name: "BestellmengeC",
-                                dataType: "Int32",
-                                value: addressSpace.findNode(getCurrentAuftrag()).getComponentByName("Body").getComponentByName("BestellmengeC").readValue().value.value
+                                value: plcToSend
                             }
                         ]
-                        },function(err,result){
-                            if(!err){
-                                callback();
-                            }
-                        })
-                    },
-                    function(callback){
-                        theSession.close();
-                        productClient.disconnect(function(err){
-                            if(!err){
-                                callback();
-                            }
-                        })
-                    }
-                ])
-            })
+                    },function(err, response){
+                        //TODO: remove this output!
+                        console.log("Callback received"+ response.outputArguments[0].value); 
+                        if(!err){
+                            markCurrentCapabilityAsDone(produkt, response);                        
+                            callback();
+                        }else{
+                            console.log(err);
+                        }
+                    })
+                },  
+                function(callback){
+                    orderSession.close(function(err){
+                        if (err){
+                            console.log(err);
+                        }
+                    });
+                    orderClient.disconnect();
+                    callback();
+                }
+            ]);
+        }
 
-            cb();
-        });
+        //Hilfsmethodik, die den nächsten Schritt im PLC auf done setzt & den ProduktStatus wieder auf "WAITING".
+        //@param: Produkt
+        function markCurrentCapabilityAsDone(produkt,response){
+            produkt.getComponentByName("Body").getComponentByName("ProduktStatus").writeValue(new opcua.SessionContext({server: server}), new opcua.DataValue({value: new opcua.Variant({dataType: "String",value:productstat.READY}),statusCode: opcua.StatusCodes.Good}),function(err){});
+            var aktCap = getCurrentCapability(produkt);
+            var finished = aktCap.getPropertyByName("finished");
+            finished.writeValue(new opcua.SessionContext({server: server}), new opcua.DataValue({value: new opcua.Variant({dataType: "Boolean",value:true}),statusCode: opcua.StatusCodes.Good}),function(err){});
+            //TODO: Remove Output.
+            console.log(aktCap.browseName.toString()+ " von Produkt"+produkt+ " ist fertig");
+            //TODO: Ergänzen um Maschinenadresse der maschine, die es hergestellt hat. --> Mglw. gar nicht nötig, da ja eh ein Link zu den Maschinen besteht? --> bei mehreren mglw alle rausslöschen ausser das ausführende.
+            //TODO: Evtl timestamps.
+
+            //Referenz zum neuen übergeordneten Produkt
+            var productNumberHigherProduct = response.outputArguments[1].value
+            if (productNumberHigherProduct!= 0){
+                var nodeIdhigherProdukt = "ns=2;s=Produkt"+productNumberHigherProduct;
+                produkt.addReference({referenceType: "ComponentOf",nodeId: nodeIdhigherProdukt});
+                //Entfernen der Referenz zum Auftragsordner
+                var referenceToDelete = produkt.findReference("Organizes",false);
+                produkt.removeReference(referenceToDelete);
+            }
+        }
+
+        //Hilfsmethode, die ein REQUEST an eine Maschine stellt ob entsprechendes Teil produziert werden kann
+        //@param: produkt, maschine, callback(response)
+        function requestProduction(produkt, maschine, fn){
+            var endpointToConnect = maschine.getComponentByName("Header").getPropertyByName("Adresse").readValue().value.value;
+            var requestClient = new opcua.OPCUAClient();
+            var requestSession;
+            var aktCap = getCurrentCapability(produkt);
+            async.series([
+                function(callback){
+                    requestClient.connect(endpointToConnect,function(err){
+                        if(!err){                            
+                            callback();
+                        }else{
+                            console.log(err);
+                        }
+                    })
+                },
+                function(callback){
+                    requestClient.createSession(function(err,session){
+                        if(!err){                                        
+                            requestSession = session;
+                            callback();
+                        }else{
+                            console.log(err);
+                        }
+                    })
+                },
+                function(callback){
+                    requestSession.call({
+                        objectId: "ns=2;s=Manifest",
+                        methodId: "ns=2;s=ManifestPort",
+                        inputArguments:[{
+                            name: "Header",
+                            dataType: "String",
+                            value: msgspec.Header.REQUEST
+                        },{
+                            name: "Type",
+                            dataType: "String",
+                            value: aktCap.browseName.toString()
+                        },{
+                            name: "Content",
+                            dataType: "String",
+                            value: produkt.getComponentByName("Header").getComponentByName("ProduktTyp").readValue().value.value
+                        }]
+                    },function(err,result){
+                        if(!err){                            
+                            fn(result);
+                            callback();
+                        }
+                    });
+                },  
+                function(callback){
+                    requestSession.close(function(err){
+                        if (err){
+                            console.log(err);
+                        }
+                    });
+                    requestClient.disconnect();
+                    callback();
+                }
+            ]);
+        }
+        
+
         
 //****** OPCUA-Methode die von ausssen aufgerufen wird wenn Gerät entfernt wird, nimmt die Goals und CurrentOutputs aller Produkte, sowie den Endpoint des Geräts
 
@@ -1269,8 +1644,24 @@ function post_initialize() {
             var deviceOutputC = inputArguments[5].value;
             var endpointToDelete = inputArguments[6].value;
 
-            //Löschen des OPCUA-Objects
+            
             var nodeToBeDeleted = Geraeteordner.getFolderElements().filter(element => endpointToDelete === element.getComponentByName("Header").getPropertyByName("Adresse").readValue().value.value)[0];
+            //Löschen der Referenzen der einzelnen Produkte zu der Maschine --> Klappt iwie nicht automatisch
+            var nodeIdNodeToBeDeleted = nodeToBeDeleted.nodeId.toString();
+            Auftragsordner.getFolderElements().forEach(function(auftrag){
+                var zugeProdArray = auftrag.getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements();
+                zugeProdArray.forEach(function(product){
+                    var capArrays = product.getComponentByName("Body").getComponentByName("ProductLifecycle").getComponents();
+                    capArrays.forEach(function(cap){
+                        var refArray = cap.findReferences("Organizes", true);
+                        if (refArray.map(r => r.nodeId.toString()).includes(nodeIdNodeToBeDeleted)){
+                            var refToDelete = refArray.filter(r=> r.nodeId.toString()=== nodeIdNodeToBeDeleted)[0]
+                            cap.removeReference(refToDelete);
+                        }
+                    })
+                })
+            });
+            //Löschen des OPCUA-Objects
             addressSpace.deleteNode(nodeToBeDeleted);
             //Capabilities entfernen
             removeCapabilities();
@@ -1297,6 +1688,7 @@ function post_initialize() {
 
                 }
             }
+            //console.log(Auftragsordner.getFolderElements()[0].getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements()[0].getComponentByName("Body").getComponentByName("ProductLifecycle").getComponentByName("Producing").getFolderElements());
             //callback an den Client senden
             callback();
             //kurze Ausgabe
@@ -1654,6 +2046,72 @@ function post_initialize() {
                 statusCode: opcua.StatusCodes.Good,
                 outputArguments:[]
             });
+        });
+
+//***** Methoden um Inputprodukte zu Erstellen
+        
+        var AddInputProductAMethod = addressSpace.addMethod(Fabrik.getComponentByName("Body"),{
+            modellingRule: "Mandatory",
+            browseName: "AddInputProductAMethod",
+            inputArguments:[
+                {
+                    name: "CapabilityToAdd",
+                    dataType: "String"
+                }
+            ],
+            outputArguments:[]
+        })
+
+        AddInputProductAMethod.addReference({referenceType: "OrganizedBy",nodeId: AddInputProductA});
+
+        AddInputProductAMethod.bindMethod(function(inputArguments,context, callback){
+            console.log("AddInputProductA called");
+            var currAuftrag = addressSpace.findNode(getCurrentAuftrag());
+            var createdProduct = createProduct(currAuftrag,producttypes.A,[capabilities.PRODUCING,inputArguments[0].value]);
+            callback();
+
+        });
+
+        var AddInputProductBMethod = addressSpace.addMethod(Fabrik.getComponentByName("Body"),{
+            modellingRule: "Mandatory",
+            browseName: "AddInputProductBMethod",
+            inputArguments:[
+                {
+                    name: "CapabilityToAdd",
+                    dataType: "String"
+                }
+            ],
+            outputArguments:[]
+        })
+
+        AddInputProductBMethod.addReference({referenceType: "OrganizedBy",nodeId: AddInputProductB});
+
+        AddInputProductBMethod.bindMethod(function(inputArguments,context, callback){
+            console.log("AddInputProductB called");
+            var currAuftrag = addressSpace.findNode(getCurrentAuftrag());
+            var createdProduct = createProduct(currAuftrag,producttypes.B,[capabilities.PRODUCING,inputArguments[0].value]);
+            callback();
+
+        });
+
+        var AddInputProductCMethod = addressSpace.addMethod(Fabrik.getComponentByName("Body"),{
+            modellingRule: "Mandatory",
+            browseName: "AddInputProductCMethod",
+            inputArguments:[
+                {
+                    name: "CapabilityToAdd",
+                    dataType: "String"
+                }
+            ],
+            outputArguments:[]
+        })
+
+        AddInputProductCMethod.addReference({referenceType: "OrganizedBy",nodeId: AddInputProductC});
+
+        AddInputProductCMethod.bindMethod(function(inputArguments,context, callback){
+            var currAuftrag = addressSpace.findNode(getCurrentAuftrag());
+            var createdProduct = createProduct(currAuftrag,producttypes.C,[capabilities.PRODUCING,inputArguments[0].value]);
+            callback();
         });
     }
 

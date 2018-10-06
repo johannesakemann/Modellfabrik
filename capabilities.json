@@ -5,5 +5,7 @@
     "PROVIDEDATA": "ProvideData",
     "COLLECTING": "Collecting",
     "DEVICEMANAGEMENT": "DeviceManagement",
-    "ASSEMBLING": "Assembling"
+    "ASSEMBLING": "Assembling",
+    "ADDINPUTPRODUCT": "AddInputProduct",
+    "PROCESSING": "Processing"
 }

@@ -1,4 +1,6 @@
 {
     "FINISHED": "Finished",
-    "INPRODUCTION": "In Producion"
+    "INPRODUCTION": "In Producion",
+    "READY":"Ready",
+    "WAITING":"waiting"
 }

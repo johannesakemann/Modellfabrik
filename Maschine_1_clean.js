@@ -1,3 +1,4 @@
+var productstat = require("./productstatus.json");
 var opcua = require("node-opcua");
 var path = require('path');
 var async = require("async");
@@ -25,7 +26,7 @@ var server = new opcua.OPCUAServer({
     }
 });
 
-var endpointFabrik = "opc.tcp://Johanness-MacBook-Pro-1057.local:4337/UA/modellfabrik";
+var endpointFabrik = "opc.tcp://Johanness-MacBook-Pro-1434.local:4337/UA/modellfabrik";
 var endpointMachine1 = server.endpoints[0].endpointDescriptions()[0].endpointUrl;
 
 function post_initialize() {
@@ -45,7 +46,7 @@ function post_initialize() {
         var productionRuns = false;
         var productionRunsA = false;
         var productionRunsB = false;
-        var timeToManufactureA = 2;
+        var timeToManufactureA = 5;
         var timeToManufactureB = 10;
         var overheatingTemperature = 26;
 ///**** Arrays festlegen
@@ -156,6 +157,22 @@ function post_initialize() {
             organizedBy: Capabilities
         });
 //***** Spezifikation der Produktions-Capability
+        // Verfügbarkeitsvariable
+        var productionAvailability = true;
+        var ProductionAvailability = addressSpace.addVariable({
+            browseName: "Available",
+            dataType: "Boolean",
+            propertyOf: Producing,
+            value:{
+                get: function(){
+                    return new opcua.Variant({dataType: "Boolean", value: productionAvailability});
+                },
+                set: function(value){
+                    productionAvailability = value.value;
+                    return opcua.StatusCodes.Good;
+                }
+            }
+        });
 
         // ProduktA
         var ProduktA = addressSpace.addObject({
@@ -693,80 +710,51 @@ function post_initialize() {
             nodeId:"ns=2;s=ProduceProductA",
             browseName: "ProduceProductA",
             inputArguments:[{
-                name: "VolumeA",
-                dataType: opcua.DataType.Int32,
-                description:"Gewuenschte Menge des Produktes A"
-            },{
-                name:"AdresseZiel",
-                dataType: opcua.DataType.String,
-                description: "Addresse des Ziels, an den die Produkte nach Fertigstellung zu schicken sind"
-            },{
-                name: "Auftraggeber",
-                dataType: opcua.DataType.String
-            },{
-                name: "Auftragsnummer",
-                dataType: opcua.DataType.Int32
-            },{
-                name: "BestellmengeA",
-                dataType: opcua.DataType.Int32,
-                description: "Die gesamte Bestellmenge von ProduktA, die für den aktuellen Auftrag gewünscht ist."
-            },{
-                name:"BestellmengeB",
-                dataType:  opcua.DataType.Int32,
-                description: "Die gesamte Bestellmenge von ProduktB, die für den aktuellen Auftrag gewünscht ist."
-            },{
-                name:"BestellmengeC",
-                dataType:  opcua.DataType.Int32,
-                description: "Die gesamte Bestellmenge von ProduktC, die für den aktuellen Auftrag gewünscht ist."
-            }]
+                name: "Produktnummer des ProduktesA",
+                dataType: "Int32"
+             },{
+                 name: "ProductLifecycleArray",
+                 arrayType: opcua.VariantArrayType.Array,
+                 valueRank:1,
+                 dataType: "String"
+             }],
+             outputArguments:[{
+                 name: "Adresse der produzierenden Maschine",
+                 dataType: "String"
+             },{
+                 name: "ProduktNumberHiogherProdukt",
+                 dataType: "Int32"
+             }]
         });
         ProduceProductA.addReference({referenceType: "OrganizedBy",nodeId: ProduktA});
 
         ProduceProductA.bindMethod(function(inputArguments,context,callback){
-            productionRuns = true;
-            var auftraggeber = inputArguments[2].value;
-            var auftragsnummer = inputArguments[3].value;
-            var bestellmengeA = inputArguments[4].value;
-            var bestellmengeB = inputArguments[5].value;
-            var bestellmengeC = inputArguments[6].value;
-            var volumeA = inputArguments[0].value;
-            outputgoalA += volumeA;
-            if(Machine_1.getComponentByName("Body").getComponentByName("CurrentAuftrag") === null){
-                createAuftrag(auftraggeber,auftragsnummer,bestellmengeA,bestellmengeB,bestellmengeC);
-                console.log("Es werden "+volumeA+" Produkte A, für Auftrag "+auftragsnummer+" hergestellt.");
-            }else if(auftragsnummer === Machine_1.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Header").getComponentByName("Auftragsnummer").readValue().value.value){
-                console.log("Es werden zusätzlich "+volumeA+" Produkte A, für Auftrag "+auftragsnummer+" hergestellt.");
-            }
-            
-            
-            var endpointZiel = inputArguments[1].value;
-            var speedA = timeToManufactureA*1000;
-            var outputA;
-
-            function produceA(){
-                if (!productionRunsB){
-                    productionRunsA = true;
-                    createProduct(producttypes.A);
-                }
-                productsA = Machine_1.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements().filter(element =>element.getComponentByName("Header").getComponentByName("ProduktTyp").readValue().value.value===producttypes.A); 
-                outputA = productsA.length;
-                productsB = Machine_1.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements().filter(element =>element.getComponentByName("Header").getComponentByName("ProduktTyp").readValue().value.value===producttypes.B); 
-                outputB = productsB.length;
-                if(outputA>=volumeA || !productionRuns){
-                    console.log("Produktionsabbruch!")
-                    productionRunsA = false;
-                    clearInterval(productionA);
-                        sendProducts(endpointZiel,productsA,producttypes.A);
-                        outputgoalA = 0;
-                    if(outputB>=outputgoalB){
-                        productionRuns = false;
-                    }
-                }
-            }
-            if (volumeA!= 0){
-                var productionA = setInterval(produceA,speedA);
-            }
-            callback();
+            productionAvailability = false;        
+            var produktNumber = inputArguments[0].value;
+            console.log("Production ProductA: "+produktNumber+" has started");
+            var productLifecycle = inputArguments[1].value;
+            var newProduct = createProduct(produktNumber,productLifecycle,producttypes.A);
+            setTimeout(function(){
+                // Callback mit positivem Signal und Adresse des produzierenden Moduls
+                callback(null,{
+                    statusCode: opcua.StatusCodes.Good,
+                    outputArguments:[
+                        {
+                            name: "Adresse der produzierenden Maschine",
+                            dataType: "String",
+                            value: endpointMachine1
+                        },{
+                            dataType: "Int32",
+                            value: 0
+                        }
+                    ]
+                });
+                console.log("Production of ProductA "+produktNumber+ " is finished");
+                //Nach der Produktion Availability der Produktionscapability wieder auf true setzen
+                productionAvailability = true;
+                //Nach der Produktion entfernen des Produktes von der Maschine
+                addressSpace.deleteNode(newProduct);    
+            },timeToManufactureA*1000)
         });
 //***** OPCUA-Methode um Produkt B herzustellen */
         var ProduceProductB = addressSpace.addMethod(Machine_1.getComponentByName("Body"),{
@@ -774,80 +762,53 @@ function post_initialize() {
             nodeId:"ns=2;s=ProduceProductB",
             browseName: "ProduceProductB",
             inputArguments:[{
-                name: "VolumeA",
-                dataType: opcua.DataType.Int32,
-                description:"Gewuenschte Menge des Produktes B"
+               name: "Produktnummer des ProduktesB",
+               dataType: "Int32"
             },{
-                name:"AdresseZiel",
-                dataType: opcua.DataType.String,
-                description: "Addresse des Ziels, an den die Produkte nach Fertigstellung zu schicken sind"
+                name: "ProductLifecycleArray",
+                arrayType: opcua.VariantArrayType.Array,
+                valueRank:1,
+                dataType: "String"
+            }],
+            outputArguments:[{
+                name: "Adresse der produzierenden Maschine",
+                dataType: "String"
             },{
-                name: "Auftraggeber",
-                dataType: opcua.DataType.String
-            },{
-                name: "Auftragsnummer",
-                dataType: opcua.DataType.Int32
-            },{
-                name: "BestellmengeA",
-                dataType: opcua.DataType.Int32,
-                description: "Die gesamte Bestellmenge von ProduktA, die für den aktuellen Auftrag gewünscht ist."
-            },{
-                name:"BestellmengeB",
-                dataType:  opcua.DataType.Int32,
-                description: "Die gesamte Bestellmenge von ProduktB, die für den aktuellen Auftrag gewünscht ist."
-            },{
-                name:"BestellmengeC",
-                dataType:  opcua.DataType.Int32,
-                description: "Die gesamte Bestellmenge von ProduktC, die für den aktuellen Auftrag gewünscht ist."
+                name: "ProduktNumberHiogherProdukt",
+                dataType: "Int32"
             }]
         });
         ProduceProductB.addReference({referenceType: "OrganizedBy",nodeId: ProduktB});
 
         ProduceProductB.bindMethod(function(inputArguments,context,callback){
-            productionRuns = true;
-            var auftraggeber = inputArguments[2].value;
-            var auftragsnummer = inputArguments[3].value;
-            var bestellmengeA = inputArguments[4].value;
-            var bestellmengeB = inputArguments[5].value;
-            var bestellmengeC = inputArguments[6].value;
-            var volumeB = inputArguments[0].value;
-            outputgoalB += volumeB;
-            if(Machine_1.getComponentByName("Body").getComponentByName("CurrentAuftrag") === null){
-                createAuftrag(auftraggeber,auftragsnummer,bestellmengeA,bestellmengeB,bestellmengeC);
-                console.log("Es werden "+volumeB+" Produkte B, für Auftrag "+ auftragsnummer+" hergestellt.");
-            } else if(auftragsnummer === Machine_1.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Header").getComponentByName("Auftragsnummer").readValue().value.value){
-                console.log("Es werden zusätzlich "+volumeB+" Produkte B,für Auftrag "+auftragsnummer+" hergestellt.");
-            }
-           
-            var endpointZiel = inputArguments[1].value;
-            var speedB = timeToManufactureB*1000;
-            var outputB;
-
-            function produceB(){
-                if(!productionRunsA){
-                    productionRunsB = true;
-                    createProduct(producttypes.B);
-                }
-                productsA = Machine_1.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements().filter(element =>element.getComponentByName("Header").getComponentByName("ProduktTyp").readValue().value.value===producttypes.A); 
-                outputA = productsA.length;
-                productsB = Machine_1.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements().filter(element =>element.getComponentByName("Header").getComponentByName("ProduktTyp").readValue().value.value===producttypes.B); 
-                outputB = productsB.length;
-                if (outputB >= volumeB || !productionRuns){
-                    clearInterval(productionB);
-                    productionRunsB = false;
-                        sendProducts(endpointZiel,productsB,producttypes.B);
-                        outputgoalB = 0;
-                    if(outputA>= outputgoalA){
-                        productionRuns = false;
-                    }
-                }
-            }
-            if (volumeB >0){
-                var productionB = setInterval(produceB,speedB);
-            }
-            callback();
-
-        });
+            productionAvailability = false;
+            var produktNumber = inputArguments[0].value;
+            console.log("Production ProductB: "+produktNumber+" has started");
+            var productLifecycle = inputArguments[1].value;
+            var newProduct = createProduct(produktNumber,productLifecycle,producttypes.B);
+            setTimeout(function(){
+                // Callback mit positivem Signal und Adresse des produzierenden Moduls
+                callback(null,{
+                    statusCode: opcua.StatusCodes.Good,
+                    outputArguments:[
+                        {
+                            name: "Adresse der produzierenden Maschine",
+                            dataType: "String",
+                            value: endpointMachine1
+                        },{
+                            dataType: "Int32",
+                            value: 0
+                        }
+                    ]
+                });
+                console.log("Production of Product "+produktNumber+ " is finished");
+                //Nach der Produktion Availability der Produktionscapability wieder auf true setzen
+                productionAvailability = true;
+                //Nach der Produktion entfernen des Produktes von der Maschine
+                addressSpace.deleteNode(newProduct);    
+            },timeToManufactureB*1000)
+            
+        })
 
 
 //***** OPCUA-Methode um Node-Ids der Informationen von ProduktA zu übermitteln */
@@ -1049,6 +1010,11 @@ function post_initialize() {
                             arrayType: opcua.VariantArrayType.Array,
                             valueRank: 1,
                             value: monitoring
+                        },{
+                            dataType: opcua.DataType.String,
+                            arrayType: opcua.VariantArrayType.Array,
+                            valueRank: 1,
+                            value: [] 
                         }]
                     
                     },function(err,response){
@@ -1078,12 +1044,13 @@ function post_initialize() {
 
 //***** JS-Funktion zur Erstellung von Produkten
 
-        function createProduct(produkttyp){
-            var produktnummer = 1000 +produktnr;
+        function createProduct(produktNumber, productLifecycle, produkttyp){
+            var produktnummer = produktNumber;
             var Produkt = AssetType.instantiate({
                 browseName:"Produkt",
                 nodeId:"ns=3;i="+produktnummer,
-                organizedBy: Machine_1.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte")
+                //TODO:Change To Some Other Location
+                organizedBy: Machine_1.getComponentByName("Body")
             });
             var ProduktType = addressSpace.addVariable({
                 browseName: "ProduktTyp",
@@ -1107,8 +1074,55 @@ function post_initialize() {
                     }
                 }
             });
-            console.log(produkttyp+" "+produktnummer+ " successfully created!")
-            produktnr++;
+
+            var ProductLifecycle = addressSpace.addObject({
+                typeDefinition: folderType,
+                componentOf: Produkt.getComponentByName("Body"),
+                browseName: "ProductLifecycle"
+            });
+
+            productLifecycle.forEach(function(process){                
+                var ProductionProcess = addressSpace.addObject({
+                    componentOf:ProductLifecycle,
+                    browseName: process
+                });
+                var numberInSequence = addressSpace.addVariable({
+                    browseName: "numberInSequence",
+                    propertyOf: ProductionProcess,
+                    dataType: "Int32",
+                    value: {
+                        get: function(){
+                            return new opcua.Variant({dataType: "Int32",value: productLifecycle.indexOf(process)});
+                        }
+                    }
+                });
+                var finished = addressSpace.addVariable({
+                    propertyOf: ProductionProcess,
+                    browseName: "finished",
+                    dataType: "Boolean",
+                    value: {
+                        get: function(){
+                            if (productLifecycle.indexOf(process)< productLifecycle.indexOf("Producing")){
+                                return new opcua.Variant({dataType: "Boolean",value: true});
+                            }else{
+                                return new opcua.Variant({dataType: "Boolean",value: false});
+                            }
+                        }
+                    }
+                })
+            });
+            var ProduktStatus = addressSpace.addVariable({
+                componentOf: Produkt.getComponentByName("Body"),
+                browseName: "ProduktStatus",
+                dataType: "String",
+                value:{
+                    get: function(){
+                            return new opcua.Variant({dataType: "String", value: productstat.INPRODUCTION });
+                    }
+                }
+            });
+
+            return Produkt;
         }
 
 //***** JS-Funktion zum Senden der aktuellen Produkte an einen Assembler */
@@ -1335,7 +1349,7 @@ function post_initialize() {
                     dataType :"Int32",
                 },
                 {
-                    name: "Producttypes",
+                    name: "InputProductTypes",
                     dataType: "String",
                     arrayType: opcua.VariantArrayType.Array,
                     valueRank:1
@@ -1350,6 +1364,9 @@ function post_initialize() {
                 },{
                     name: "NodeIdOfParentObject",
                     dataType: "String"
+                },{
+                    name: "CapabilityPossible",
+                    dataType: "Boolean"
                 }]
 
         });
@@ -1392,6 +1409,9 @@ function post_initialize() {
                                 },{
                                     dataType: "String",
                                     value: "0"
+                                },{
+                                    dataType: "Boolean",
+                                    value: ProductionAvailability.readValue().value.value
                                 }
                             ]
                         })
@@ -1418,6 +1438,9 @@ function post_initialize() {
                                 },{
                                     dataType: "String",
                                     value: "0"
+                                },{
+                                    dataType: "Boolean",
+                                    value : false
                                 }
                             ]
                         })
@@ -1447,6 +1470,9 @@ function post_initialize() {
                             },{
                                 dataType: "String",
                                 value: "0"
+                            },{
+                                dataType: "Boolean",
+                                value: true
                             }]
                         });
                     }else{
@@ -1471,6 +1497,9 @@ function post_initialize() {
                             },{
                                 dataType: "String",
                                 value: "0"
+                            },{
+                                dataType: "Boolean",
+                                value: false
                             }]
                         });
                     }
@@ -1499,6 +1528,9 @@ function post_initialize() {
                             },{
                                 dataType: "String",
                                 value: "0"
+                            },{
+                                dataType: "Boolean",
+                                value: true
                             }]
                         });
                     }else{
@@ -1523,6 +1555,9 @@ function post_initialize() {
                             },{
                                 dataType: "String",
                                 value: "0"
+                            },{
+                                dataType: "Boolean",
+                                value: false
                             }]
                         });
                     }
@@ -1548,7 +1583,10 @@ function post_initialize() {
                         },{
                             dataType: "String",
                             value: "0"
-                        }]
+                        },{
+                            dataType: "Boolean",
+                            value: false
+                        },]
                     });
                 }
             }else if(header === msgspec.Header.ORDER){
@@ -1581,6 +1619,9 @@ function post_initialize() {
                                     },{
                                         dataType: "String",
                                         value: objectIdToRespond
+                                    },{
+                                        dataType: "Boolean",
+                                        value: true
                                     }
                                 ]
                             });
@@ -1614,6 +1655,9 @@ function post_initialize() {
                                     },{
                                         dataType: "String",
                                         value: objectIdOfNodeId
+                                    },{
+                                        dataType: "Boolean",
+                                        value: true
                                     }
                                 ]
                             });
@@ -1643,6 +1687,9 @@ function post_initialize() {
                         },{
                             dataType :"String",
                             value : "0"
+                        },{
+                            dataType: "Boolean",
+                            value: false
                         }
                     ]
                 });

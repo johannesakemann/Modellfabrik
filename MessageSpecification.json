@@ -8,7 +8,8 @@
         "MONITORING": "Monitoring",
         "PRODUCING" :"Producing",
         "COLLECTING": "Collecting",
-        "DEVICEMANAGEMENT": "DeviceManagement"
+        "DEVICEMANAGEMENT": "DeviceManagement",
+        "PROCESSING": "Processing"
     },
     "Content":{
         "Showing": {
@@ -36,6 +37,16 @@
         "DeviceManagement":{
             "REGISTER":"RegisterDevice",
             "REMOVE": "RemoveDevice"
+        },
+        "AddInputProduct":{
+            "A": "ProduktA",
+            "B": "ProduktB",
+            "C": "ProduktC"
+        },
+        "Processing":{
+            "A":"ProduktA",
+            "B":"ProduktB",
+            "C":"ProduktC"
         }
     }
 
