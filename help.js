@@ -84,7 +84,7 @@ module.exports ={
         return bestSolution;
     },
     transformFabrikPowerToLEDPower: function(fabrikPower){
-        if(fabrikPower){
+        if(!fabrikPower){
             return 0;
         }else{
             return 1;

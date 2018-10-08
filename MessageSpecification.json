@@ -29,11 +29,6 @@
             "B":"ProduktB",
             "C":"ProduktC"
         },
-        "Collecting":{
-            "A": "ProduktA",
-            "B": "ProduktB",
-            "C": "ProduktC"
-        },
         "DeviceManagement":{
             "REGISTER":"RegisterDevice",
             "REMOVE": "RemoveDevice"
@@ -49,5 +44,4 @@
             "C":"ProduktC"
         }
     }
-
 }

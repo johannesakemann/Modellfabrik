@@ -36,12 +36,8 @@ function post_initialize() {
         var addressSpace = server.engine.addressSpace;
         var objectFolder = addressSpace.findNode("ns=0;i=85");
         var folderType = addressSpace.findNode("ns=0;i=61");
-        
-        var productionRuns = false;
+    
         var produktnummer = 0;
-        var outputGoal = 0;
-        var mengeAproC = 0;
-        var mengeBproC = 0;
 //****** Definition des abstrakten Typen AssetType        
         var AssetType = addressSpace.addObjectType({
             browseName: "AssetType"
@@ -98,11 +94,6 @@ function post_initialize() {
             browseName: capabilities.SHOWING,
             organizedBy: Capabilities
         });
-        var Collect = addressSpace.addObject({
-            browseName: capabilities.COLLECTING,
-            organizedBy: Capabilities
-        });
-
         var Monitoring = addressSpace.addObject({
             browseName: capabilities.MONITORING,
             organizedBy: Capabilities
@@ -192,38 +183,8 @@ function post_initialize() {
         var Production = addressSpace.addObject({
             browseName: "Production",
             componentOf:Monitoring
-        })
-//****** Spezifikation der Collecting Capability */
-        var ProduktACollecting = addressSpace.addObject({
-            browseName: producttypes.A,
-            componentOf: Collect
         });
-
-        var productTypeACollecting = addressSpace.addVariable({
-            browseName: "ProduktTyp",
-            propertyOf: ProduktACollecting,
-            dataType: "String",
-            value: {
-                get: function(){
-                    return new opcua.Variant({dataType: "String",value: producttypes.A});
-                }
-            }
-        });
-        var ProduktBCollecting = addressSpace.addObject({
-            browseName: producttypes.B,
-            componentOf: Collect
-        });
-        
-        var productTypeBCollecting = addressSpace.addVariable({
-            browseName: "ProduktTyp",
-            propertyOf: ProduktBCollecting,
-            dataType: "String",
-            value: {
-                get: function(){
-                    return new opcua.Variant({dataType: "String",value: producttypes.B});
-                }
-            }
-        }); 
+       
 //****** Spezifikation der Showing Capability
         var Light = addressSpace.addObject({
             browseName:"Light",
@@ -744,7 +705,7 @@ function post_initialize() {
             componentOf: LED.getComponentByName("Body"),
             value:{
                 get: function(){
-                    return new opcua.Variant({dataType: "Int32", value:help.transformFabrikPowerToLEDPower(productionRuns)});
+                    return new opcua.Variant({dataType: "Int32", value:help.transformFabrikPowerToLEDPower(productionAvailability)});
                 }
             }
         });
@@ -793,34 +754,7 @@ function post_initialize() {
             }
         });
         Adress.addReference({referenceType:"OrganizedBy",nodeId: Identification});
-        var ProductionsRuns = addressSpace.addVariable({
-            browseName: "ProductionRuns",
-            dataType: "Boolean",
-            componentOf: Assembler.getComponentByName("Header"),
-            value:{
-                get: function(){
-                    return new opcua.Variant({dataType: "Boolean", value: productionRuns});
-                }
-            }
-        });
-        ProductionsRuns.addReference({referenceType: "OrganizedBy", nodeId: Production});
-//****** Anlegen Outputgoal */
-        var OutputGoal = addressSpace.addVariable({
-            browseName: "OutputGoal",
-            dataType: "Int32",
-            propertyOf : Assembler.getComponentByName("Header"),
-            value:{
-                get: function(){
-                    return new opcua.Variant({dataType: opcua.DataType.Int32,value: outputGoal});
-                },
-                set: function(variant){                    
-                    outputGoal = variant.value;
-                    console.log("Outputgoal changed to: "+ outputGoal);
-                    return opcua.StatusCodes.Good;
-                }
-            }
-        });
-        OutputGoal.addReference({referenceType:"OrganizedBy",nodeId: ProduktCMonitoring});
+    
 //****** Anlegen Output Variable für ProduktC
         var Output = addressSpace.addVariable({
             browseName:"Output",
@@ -837,38 +771,6 @@ function post_initialize() {
             }
         });
         Output.addReference({referenceType:"OrganizedBy",nodeId: ProduktCMonitoring});        
-//****** Anlegen VerhaeltnisVariablen */
-        var MengeAproC = addressSpace.addVariable({
-            browseName: "MengeAproC",
-            dataType: "Int32",
-            propertyOf : Assembler.getComponentByName("Header"),
-            value:{
-                get: function(){
-                    return new opcua.Variant({dataType: opcua.DataType.Int32,value: mengeAproC});
-                },
-                set: function(variant){
-                    mengeAproC = variant.value;
-                    console.log("Menge A pro C changed to: "+mengeAproC);
-                    return opcua.StatusCodes.Good;
-                }
-            }
-        });
-        var MengeBproC = addressSpace.addVariable({
-            browseName: "MengeBproC",
-            dataType: "Int32",
-            propertyOf : Assembler.getComponentByName("Header"),
-            value:{
-                get: function(){
-                    return new opcua.Variant({dataType: opcua.DataType.Int32,value: mengeBproC});
-                },
-                set: function(variant){
-                    mengeBproC = variant.value;
-                    console.log("Menge B pro C changed to: "+mengeBproC);
-                    return opcua.StatusCodes.Good;
-                }
-            }
-        });
-
 
 //****** Instanziieren des Displays */
 
@@ -1073,276 +975,6 @@ function post_initialize() {
                 console.log(err);
             }
         })
-//****** JS-Methode zur Erstellung von Aufträgen */
-
-        function createAuftrag(auftraggeber, auftragsnummer,bestellmengeA,bestellmengeB,bestellmengeC){
-            var Auftrag = AssetType.instantiate({
-                browseName: "CurrentAuftrag",
-                componentOf: Assembler.getComponentByName("Body")
-            });
-
-            var AuftragsBody = addressSpace.addObject({
-                browseName: "Body",
-                typeDefinition: folderType,
-                componentOf: Auftrag
-            })
-
-            var Auftraggeber = addressSpace.addVariable({
-                componentOf: Auftrag.getComponentByName("Header"),
-                dataType: "String",
-                browseName: "Auftraggeber",
-                value:{
-                    get: function(){
-                        return new opcua.Variant({dataType: "String", value: auftraggeber});
-                    }
-                }
-            });
-
-
-            var Auftragsnummer = addressSpace.addVariable({
-                componentOf: Auftrag.getComponentByName("Header"),
-                dataType: "Int32",
-                browseName: "Auftragsnummer",
-                value:{
-                    get: function(){
-                        return new opcua.Variant({dataType: "Int32", value: auftragsnummer});
-                    }
-                }
-            });
-
-            var BestellmengeA = addressSpace.addVariable({
-                componentOf: Auftrag.getComponentByName("Body"),
-                dataType: "Int32",
-                browseName: "BestellmengeA",
-                value:{
-                    get: function(){
-                        return new opcua.Variant({dataType: "Int32", value: bestellmengeA});
-                    }
-                }
-            });
-            var BestellmengeB = addressSpace.addVariable({
-                componentOf: Auftrag.getComponentByName("Body"),
-                dataType: "Int32",
-                browseName: "BestellmengeB",
-                value:{
-                    get: function(){
-                        return new opcua.Variant({dataType: "Int32", value:bestellmengeB});
-                    }
-                }
-            });
-            var BestellmengeC = addressSpace.addVariable({
-                componentOf: Auftrag.getComponentByName("Body"),
-                dataType: "Int32",
-                browseName: "BestellmengeC",
-                value:{
-                    get: function(){
-                        return new opcua.Variant({dataType: "Int32", value:bestellmengeC});
-                    }
-                }
-            });
-            var Auftragsstatus = addressSpace.addVariable({
-                componentOf: Auftrag.getComponentByName("Header"),
-                dataType: "String",
-                browseName: "Auftragsstatus",
-                value:{
-                    get: function(){
-                        return new opcua.Variant({dataType: "String", value:auftragsstat.INPRODUCTION});
-                    },
-                    set: function(variant){
-                        auftragsstatus = variant.value;
-                        return opcua.StatusCodes.Good;
-                    }
-                }
-            });
-
-            var AuftragProduktordner = addressSpace.addObject({
-                componentOf:Auftrag.getComponentByName("Body"),
-                browseName: "Zugehoerige Produkte",
-                typeDefinition: folderType
-            })
-        }
-
-//****** Methode zur Aufnahme der Produkte A durch den Assembler
-
-        var collectProductsA = addressSpace.addMethod(Assembler.getComponentByName("Body"),{
-            browseName:"CollectProductsA",
-            modellingRule: "Mandatory",
-            inputArguments:[{
-                name: "Produktnummern Produkt A",
-                dataType: "Int32",
-                valueRank:1,
-                arrayType: opcua.VariantArrayType.Array,
-            },{
-                name: "Auftraggeber",
-                dataType: "String"
-            },{
-                name: "Auftragsnummer",
-                dataType: opcua.DataType.Int32
-            },{
-                name: "BestellmengeA",
-                dataType: opcua.DataType.Int32,
-                description: "Die gesamte Bestellmenge des Endproduktes, die für den aktuellen Auftrag gewünscht ist."
-            },{
-                name:"BestellmengeB",
-                dataType:  opcua.DataType.Int32,
-                description: "Menge, die im aktuellen Auftrag von A ins Endprodukt einfliessen sollen."
-            },{
-                name:"BestellmengeC",
-                dataType:  opcua.DataType.Int32,
-                description: "Menge, die im aktuellen Auftrag von B ins Endprodukt einfliessen sollen."
-            }]
-        });
-        collectProductsA.addReference({referenceType: "OrganizedBy",nodeId: ProduktACollecting});
-        collectProductsA.bindMethod(function(inputArguments,context,callback){
-
-            var productsA = inputArguments[0].value; 
-            var auftraggeber = inputArguments[1].value;
-            var auftragsnummer = inputArguments[2].value;
-            var bestellmengeA = inputArguments[3].value;
-            var bestellmengeB = inputArguments[4].value;
-            var bestellmengeC = inputArguments[5].value;
-            
-
-            if(Assembler.getComponentByName("Body").getComponentByName("CurrentAuftrag")===null){
-                console.log("Hier");
-                createAuftrag(auftraggeber,auftragsnummer,bestellmengeA,bestellmengeB,bestellmengeC);
-            }else if (Assembler.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Header").getComponentByName("Auftragsnummer").readValue().value.value !== auftragsnummer){
-                createAuftrag(auftraggeber,auftragsnummer,bestellmengeA,bestellmengeB,bestellmengeC);
-            }
-            
-            productsA.forEach( function(productnumberA){
-                var Produkt = AssetType.instantiate({
-                    browseName:producttypes.A,
-                    organizedBy: Assembler.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte")
-                });
-                var ProduktType = addressSpace.addVariable({
-                    browseName: "ProduktTyp",
-                    componentOf: Produkt.getComponentByName("Header"),
-                    dataType:"String",
-                    value:{
-                        get: function(){
-                            return new opcua.Variant({dataType:"String", value: producttypes.A})
-                        }
-                    }
-                });
-                var ProduktNummer = addressSpace.addVariable({
-                    browseName: "Produktnummer",
-                    dataType:"Int32",
-                    componentOf:Produkt.getComponentByName("Header"),
-                    value:{
-                        get: function(){
-                            return new opcua.Variant({dataType:"Int32",value: productnumberA})
-                        }
-                    }
-                });
-            });
-            var produkteA =Assembler.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements().filter(e => e.getComponentByName("Header").getComponentByName("ProduktType") === producttypes.A);
-            var produkteB =Assembler.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements().filter(e => e.getComponentByName("Header").getComponentByName("ProduktType") === producttypes.B);
-            if (produkteA.length >= MengeAproC.readValue().value.value && produkteB.length >= MengeBproC.readValue().value.value){
-                productionRuns = true;
-                produceProductC.execute([{dataType:"Int32",value:1}],new opcua.SessionContext(),function(err,result){
-                    if(!err){
-                        //console.log("Assemble Called!");
-                    }else{
-                        console.log(err);
-                    }
-                })
-            }
-            callback(null,{
-                statusCode: opcua.StatusCodes.Good
-            });
-
-        });
-
-//****** Methode zur Aufnahme der Produkte B durch den Assembler
-        var collectProductsB = addressSpace.addMethod(Assembler.getComponentByName("Body"),{
-            browseName:"CollectProductsB",
-            modellingRule: "Mandatory",
-            inputArguments:[{
-                name: "Produktnummern Produkt B",
-                dataType: "Int32",
-                valueRank:1,
-                arrayType: opcua.VariantArrayType.Array,
-            },{
-                name: "Auftraggeber",
-                dataType: "String"
-            },{
-                name: "Auftragsnummer",
-                dataType: opcua.DataType.Int32
-            },{
-                name: "BestellmengeA",
-                dataType: opcua.DataType.Int32,
-                description: "Die gesamte Bestellmenge des Endproduktes, die für den aktuellen Auftrag gewünscht ist."
-            },{
-                name:"BestellmengeB",
-                dataType:  opcua.DataType.Int32,
-                description: "Menge, die im aktuellen Auftrag von A ins Endprodukt einfliessen sollen."
-            },{
-                name:"BestellmengeC",
-                dataType:  opcua.DataType.Int32,
-                description: "Menge, die im aktuellen Auftrag von B ins Endprodukt einfliessen sollen."
-            }]
-        });
-        collectProductsB.addReference({referenceType: "OrganizedBy",nodeId: ProduktBCollecting});
-        collectProductsB.bindMethod(function(inputArguments,context,callback){
-
-            var productsB = inputArguments[0].value; 
-            var auftraggeber = inputArguments[1].value;
-            var auftragsnummer = inputArguments[2].value;
-            var bestellmengeA = inputArguments[3].value;
-            var bestellmengeB = inputArguments[4].value;
-            var bestellmengeC = inputArguments[5].value;
-            
-
-            if(Assembler.getComponentByName("Body").getComponentByName("CurrentAuftrag")===null){
-                createAuftrag(auftraggeber,auftragsnummer,bestellmengeA,bestellmengeB,bestellmengeC);
-            }else if (Assembler.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Header").getComponentByName("Auftragsnummer").readValue().value.value !== auftragsnummer){
-                createAuftrag(auftraggeber,auftragsnummer,bestellmengeA,bestellmengeB,bestellmengeC);
-            }
-            
-            productsB.forEach( function(productnumberB){
-                var Produkt = AssetType.instantiate({
-                    browseName:producttypes.B,
-                    organizedBy: Assembler.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte")
-                });
-                var ProduktType = addressSpace.addVariable({
-                    browseName: "ProduktTyp",
-                    componentOf: Produkt.getComponentByName("Header"),
-                    dataType:"String",
-                    value:{
-                        get: function(){
-                            return new opcua.Variant({dataType:"String", value: producttypes.B})
-                        }
-                    }
-                });
-                var ProduktNummer = addressSpace.addVariable({
-                    browseName: "Produktnummer",
-                    dataType:"Int32",
-                    componentOf:Produkt.getComponentByName("Header"),
-                    value:{
-                        get: function(){
-                            return new opcua.Variant({dataType:"Int32",value: productnumberB})
-                        }
-                    }
-                });
-            });
-            var produkteA =Assembler.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements().filter(e => e.getComponentByName("Header").getComponentByName("ProduktType") === producttypes.A);
-            var produkteB =Assembler.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements().filter(e => e.getComponentByName("Header").getComponentByName("ProduktType") === producttypes.B);
-            if (produkteA.length >= MengeAproC.readValue().value.value && produkteB.length >= MengeBproC.readValue().value.value){
-                productionRuns = true;
-                produceProductC.execute([{dataType:"Int32",value:1}],new opcua.SessionContext(),function(err,result){
-                    if(!err){
-                        //console.log("Assemble Called!");
-                    }else{
-                        console.log(err);
-                    }
-                })
-            }
-            callback(null,{
-                statusCode: opcua.StatusCodes.Good
-            });
-
-        });
 
 //****** OPCUA-Methode um Node-Ids der ProduktC Monitoring  zurückzugeben*/
         var ProvideProductCData = addressSpace.addMethod(Assembler.getComponentByName("Body"),{
@@ -1407,7 +1039,7 @@ function post_initialize() {
                 statusCode: opcua.StatusCodes.Good,
                 outputArguments:[{
                     dataType: "String",
-                    value: ProductionsRuns.nodeId.toString()
+                    value: ProductionAvailability.nodeId.toString()
                 }]
             });
         })
@@ -1647,7 +1279,7 @@ function post_initialize() {
                         console.log("Production of Product "+currentProduct.getComponentByName("Header").getComponentByName("Produktnummer").readValue().value.value+" finished");
                         addressSpace.deleteNode(currentProduct);
                         productionAvailability = true;
-                    }, TimeToManufacture.readValue().value.value*1000);   
+                    },TimeToManufacture.readValue().value.value*1000);   
                 }else{
                     setTimeout(checkForInput,2000);
                 }
@@ -1736,253 +1368,6 @@ function post_initialize() {
 
             return Produkt;
         }
-//****** JS-Methode um Produkte zu senden */
-        function sendAllProducts(){
-            var products = Assembler.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements();
-            var productsC = transportProductsFromAuftrag(Assembler.getComponentByName("Body").getComponentByName("CurrentAuftrag"));
-            var productsB = products.filter(p => p.browseName.toString() === producttypes.B).map(p => p.getComponentByName("Header").getComponentByName("Produktnummer").readValue().value.value);
-            var productsA = products.filter(p => p.browseName.toString() === producttypes.A).map(p => p.getComponentByName("Header").getComponentByName("Produktnummer").readValue().value.value);
-            var objectIdCC;
-            var methodIdCC;
-            var objectIdCB;
-            var methodIdCB;
-            var objectIdCA;
-            var methodIdCA;
-            var the_session;                    
-            async.series([
-                function(callback){
-                    client.connect(endpointFabrik,function(err){
-                        callback();
-                    });
-                },
-                function(callback){
-                    client.createSession(function(err,session){
-                        if(!err){
-                            the_session = session;
-                            callback();
-                        }else{
-                            console.log(err);
-                        }
-                    })
-                    
-                },
-                function(callback){
-                    the_session.call({
-                        objectId: "ns=2;s=Manifest",
-                        methodId: "ns=2;s=ManifestPort",
-                        inputArguments:[{
-                            name: "Header",
-                            dataType: "String",
-                            value: msgspec.Header.ORDER
-                        },{
-                            name: "Type",
-                            dataType: "String",
-                            value: msgspec.Type.COLLECTING
-                        },{
-                            name: "Content",
-                            dataType: "String",
-                            value: producttypes.C
-                        }]
-                    },function(err,result){
-                        if(!err){
-                            methodIdCC = result.outputArguments[3].value;
-                            objectIdCC = result.outputArguments[4].value;
-                            console.log("Produkte C gesendet!");
-                            callback();
-                        }else{
-                            console.log(err);
-                        }
-                    });                    
-                },
-                function(callback){
-                    the_session.call({
-                        objectId: objectIdCC,
-                        methodId: methodIdCC,
-                        inputArguments:[{
-                            name: "Produktnummern",
-                            dataType: "Int32",
-                            valueRank: 1,
-                            arrayType: opcua.VariantArrayType.Array,
-                            value: productsC
-                        },{
-                            name: "AperC",
-                            dataType: "Int32",
-                            value: ProduktC.getPropertyByName("Input").getFolderElements().filter(e => e.browseName.toString() === producttypes.A)[0].getPropertyByName("Number").readValue().value.value
-                        },{
-                            name: "BperC",
-                            dataType:"Int32",
-                            value: ProduktC.getPropertyByName("Input").getFolderElements().filter(e => e.browseName.toString() === producttypes.B)[0].getPropertyByName("Number").readValue().value.value
-                        }]
-                    },function(err,result){
-                        if(!err){
-                            callback();
-                        }
-                    })
-                },
-                function(callback){
-                    the_session.call({
-                        objectId: "ns=2;s=Manifest",
-                        methodId: "ns=2;s=ManifestPort",
-                        inputArguments:[{
-                            name: "Header",
-                            dataType: "String",
-                            value: msgspec.Header.ORDER
-                        },{
-                            name: "Type",
-                            dataType: "String",
-                            value: msgspec.Type.COLLECTING
-                        },{
-                            name: "Content",
-                            dataType: "String",
-                            value: producttypes.B
-                        }]
-                    },function(err,result){
-                        if(!err){
-                            methodIdCB = result.outputArguments[3].value;
-                            objectIdCB = result.outputArguments[4].value;
-                            callback();
-                            console.log("Produkte B gesendet");
-                        }else{
-                            console.log(err);
-                        }
-                    });
-                },
-                function(callback){
-                    the_session.call({
-                        objectId: objectIdCB,
-                        methodId: methodIdCB,
-                        inputArguments:[{
-                            name: "Produktnummern",
-                            dataType: "Int32",
-                            valueRank: 1,
-                            arrayType: opcua.VariantArrayType.Array,
-                            value: productsB
-                        },{
-                            name:"Auftraggeber",
-                            dataType: "String",
-                            value: "SomeString"
-                        },{
-                            name: "Auftragsnummer",
-                            dataType: "Int32",
-                            value: 0
-                        },{
-                            name:"BestellmengeA",
-                            dataType: "Int32",
-                            value: 0
-                        },{
-                            name: "BestellmengeB",
-                            dataType: "Int32",
-                            value: 0
-                        },{
-                            name: "BestellmengeC",
-                            dataType: "Int32",
-                            value: 0
-                        }]
-                    },function(err,result){
-                        if(!err){
-                            callback();
-                        }
-                    })
-                },
-                function(callback){
-                    the_session.call({
-                        objectId: "ns=2;s=Manifest",
-                        methodId: "ns=2;s=ManifestPort",
-                        inputArguments:[{
-                            name: "Header",
-                            dataType: "String",
-                            value: msgspec.Header.ORDER
-                        },{
-                            name: "Type",
-                            dataType: "String",
-                            value: msgspec.Type.COLLECTING
-                        },{
-                            name: "Content",
-                            dataType: "String",
-                            value: producttypes.A
-                        }]
-                    },function(err,result){
-                        if(!err){
-                            methodIdCA = result.outputArguments[3].value;
-                            objectIdCA = result.outputArguments[4].value;
-                            console.log("Produkte A gesendet");
-                            callback();
-                        }else{
-                            console.log(err)
-                        }
-                    });
-                },function(callback){
-                    the_session.call({
-                        objectId: objectIdCA,
-                        methodId: methodIdCA,
-                        inputArguments:[{
-                            name: "Produktnummern",
-                            dataType: "Int32",
-                            valueRank: 1,
-                            arrayType: opcua.VariantArrayType.Array,
-                            value: productsA
-                        },{
-                            name:"Auftraggeber",
-                            dataType: "String",
-                            value: "SomeString"
-                        },{
-                            name: "Auftragsnummer",
-                            dataType: "Int32",
-                            value: 0
-                        },{
-                            name:"BestellmengeA",
-                            dataType: "Int32",
-                            value: 0
-                        },{
-                            name: "BestellmengeB",
-                            dataType: "Int32",
-                            value: 0
-                        },{
-                            name: "BestellmengeC",
-                            dataType: "Int32",
-                            value: 0
-                        }]
-                    },function(err,result){
-                        if(!err){
-                            callback();
-                        }
-                    })
-                },
-                function(callback){
-                    var nodesToBeDeleted = Assembler.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements();;
-                    nodesToBeDeleted.forEach(function(element){
-                        addressSpace.deleteNode(element);
-                    });
-                    addressSpace.deleteNode(Assembler.getComponentByName("Body").getComponentByName("CurrentAuftrag"));
-                    callback();
-                },
-                function(callback){
-                    the_session.close();
-                    client.disconnect();
-                    callback();
-                }
-            ]);
-        }
-//****** JS-Hilfsmethode um aus den Produkten einese Auftrag ein Array zum Transport herzustellen */
-
-
-        function transportProductsFromAuftrag(Auftrag){
-            var result = [];
-            var endProducts = Auftrag.getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements().filter(product => product.getComponentByName("Header").getComponentByName("ProduktTyp").readValue().value.value===producttypes.C);
-            for(var i = 0; i < endProducts.length; i++){
-                result.push(endProducts[i].getComponentByName("Header").getComponentByName("Produktnummer").readValue().value.value);
-                var productsA = endProducts[i].getComponentByName("Body").getComponents().filter(teilprodukt => teilprodukt.getComponentByName("Header").getComponentByName("ProduktTyp").readValue().value.value === producttypes.A);
-                var productsB = endProducts[i].getComponentByName("Body").getComponents().filter(teilprodukt => teilprodukt.getComponentByName("Header").getComponentByName("ProduktTyp").readValue().value.value === producttypes.B);
-                for(var j = 0;j < productsA.length;j++){
-                    result.push(productsA[j].getComponentByName("Header").getComponentByName("Produktnummer").readValue().value.value);
-                }
-                for(var j = 0;j < productsB.length;j++){
-                    result.push(productsB[j].getComponentByName("Header").getComponentByName("Produktnummer").readValue().value.value);
-                }
-            }
-            return result;
-        }
-        
 //****** Servererstellung  */
     }
     construct_my_address_space(server);

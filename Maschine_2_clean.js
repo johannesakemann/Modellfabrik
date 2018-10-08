@@ -40,25 +40,11 @@ function post_initialize() {
 
 //***** JS Variablen zu OPCUA-Variablen        
         var temperature_1 = 1.0;
-        var outputgoalA = 0;
-        var outputgoalB = 0;
         var produktnr = 1;
         var productionRuns = false;
-        var productionRunsA = false;
-        var productionRunsB = false;
         var timeToManufactureA = 10;
         var timeToManufactureB = 5;
         var overheatingTemperature = 26;
-///**** Arrays festlegen
-        var the_session, the_subscription;
-        var productionOppAndTime1 = [0,2];
-        var productionOppAndTime2 = [8,5];
-        var productionOppAndTime3 = [4,0];
-                
-        var runProductionOppAndTime1 = false;
-        var runProductionOppAndTime2 = false;
-        var runProductionOppAndTime3 = false;
-
  //***********Definition der abstrakten Types
         
         
@@ -278,36 +264,6 @@ function post_initialize() {
             }
         });
         ProductionRuns.addReference({referenceType: "OrganizedBy",nodeId: Produktion});
-//***** Machine1 --- Outputgoals */
-        var OutputgoalA = addressSpace.addVariable({
-            browseName: "OutputGoalProductA",
-            dataType: "Int32",
-            propertyOf: Machine_2.getComponentByName("Body"),
-            value:{
-                get: function(){
-                    return new opcua.Variant({dataType: "Int32", value:outputgoalA});
-                },
-                set: function(variant){
-                    outputgoal_A = variant.value;
-                }
-            }
-        });
-        OutputgoalA.addReference({referenceType: "OrganizedBy",nodeId: ProduktAMonitoring});
-
-        var OutputgoalB = addressSpace.addVariable({
-            browseName: "OutputGoalProductB",
-            dataType: "Int32",
-            propertyOf: Machine_2.getComponentByName("Body"),
-            value:{
-                get: function(){
-                    return new opcua.Variant({dataType: "Int32", value:outputgoalB});
-                },
-                set: function(variant){
-                    outputgoal_B = variant.value;
-                }
-            }
-        });
-        OutputgoalB.addReference({referenceType: "OrganizedBy",nodeId: ProduktBMonitoring});
 
 //***** Instanzieren Temperatursensor       
         var TemperatureSensor = AssetType.instantiate({
@@ -824,9 +780,6 @@ function post_initialize() {
                 },{
                     name: "OutputA",
                     dataType: "String"
-                },{
-                    name: "OutputgoalA",
-                    dataType: "String"
                 }
             ]
         });
@@ -841,9 +794,6 @@ function post_initialize() {
                     },{
                         dataType: "String",
                         value: OutputA.nodeId.toString()
-                    },{
-                        dataType: "String",
-                        value: OutputgoalA.nodeId.toString()
                     }
                 ]
             })
@@ -861,9 +811,6 @@ function post_initialize() {
                 },{
                     name: "OutputB",
                     dataType: "String"
-                },{
-                    name: "OutputgoalB",
-                    dataType: "String"
                 }
             ]
         });
@@ -878,9 +825,6 @@ function post_initialize() {
                     },{
                         dataType: "String",
                         value: OutputB.nodeId.toString()
-                    },{
-                        dataType: "String",
-                        value: OutputgoalB.nodeId.toString()
                     }
                 ]
             })
@@ -1044,284 +988,87 @@ function post_initialize() {
 
 //***** JS-Funktion zur Erstellung von Produkten
 
-function createProduct(produktNumber, productLifecycle, produkttyp){
-    var produktnummer = produktNumber;
-    var Produkt = AssetType.instantiate({
-        browseName:"Produkt",
-        nodeId:"ns=3;i="+produktnummer,
-        //TODO:Change To Some Other Location
-        organizedBy: Machine_2.getComponentByName("Body")
-    });
-    var ProduktType = addressSpace.addVariable({
-        browseName: "ProduktTyp",
-        componentOf: Produkt.getComponentByName("Header"),
-        nodeId:"ns=3;i=2"+produktnummer,
-        dataType:"String",
-        value:{
-            get: function(){
-                return new opcua.Variant({dataType:"String", value: produkttyp})
-            }
-        }
-    });
-    var ProduktNummer = addressSpace.addVariable({
-        browseName: "Produktnummer",
-        dataType:"Int32",
-        nodeId:"ns=3;i=1"+produktnummer,
-        componentOf:Produkt.getComponentByName("Header"),
-        value:{
-            get: function(){
-                return new opcua.Variant({dataType:"Int32",value: produktnummer})
-            }
-        }
-    });
-
-    var ProductLifecycle = addressSpace.addObject({
-        typeDefinition: folderType,
-        componentOf: Produkt.getComponentByName("Body"),
-        browseName: "ProductLifecycle"
-    });
-
-    productLifecycle.forEach(function(process){                
-        var ProductionProcess = addressSpace.addObject({
-            componentOf:ProductLifecycle,
-            browseName: process
-        });
-        var numberInSequence = addressSpace.addVariable({
-            browseName: "numberInSequence",
-            propertyOf: ProductionProcess,
-            dataType: "Int32",
-            value: {
-                get: function(){
-                    return new opcua.Variant({dataType: "Int32",value: productLifecycle.indexOf(process)});
-                }
-            }
-        });
-        var finished = addressSpace.addVariable({
-            propertyOf: ProductionProcess,
-            browseName: "finished",
-            dataType: "Boolean",
-            value: {
-                get: function(){
-                    if (productLifecycle.indexOf(process)< productLifecycle.indexOf("Producing")){
-                        return new opcua.Variant({dataType: "Boolean",value: true});
-                    }else{
-                        return new opcua.Variant({dataType: "Boolean",value: false});
+        function createProduct(produktNumber, productLifecycle, produkttyp){
+            var produktnummer = produktNumber;
+            var Produkt = AssetType.instantiate({
+                browseName:"Produkt",
+                nodeId:"ns=3;i="+produktnummer,
+                //TODO:Change To Some Other Location
+                organizedBy: Machine_2.getComponentByName("Body")
+            });
+            var ProduktType = addressSpace.addVariable({
+                browseName: "ProduktTyp",
+                componentOf: Produkt.getComponentByName("Header"),
+                nodeId:"ns=3;i=2"+produktnummer,
+                dataType:"String",
+                value:{
+                    get: function(){
+                        return new opcua.Variant({dataType:"String", value: produkttyp})
                     }
                 }
-            }
-        })
-    });
-    var ProduktStatus = addressSpace.addVariable({
-        componentOf: Produkt.getComponentByName("Body"),
-        browseName: "ProduktStatus",
-        dataType: "String",
-        value:{
-            get: function(){
-                    return new opcua.Variant({dataType: "String", value: productstat.INPRODUCTION });
-            }
-        }
-    });
-
-    return Produkt;
-}
-
-//***** JS-Funktion zum Senden der aktuellen Produkte an einen Assembler */
-    //Achtung: löscht nach Senden alle Produkte von der Maschine
-    //@param endpointAssembler: Endpoint des Ziels zu dem geschickt werden soll
-    //@param products: Alle Produkte die geschickt werden sollen
-    //@param producttype: Produkttyp der Produkt, die geschickt werden sollen
-
-        function sendProducts(endpointZiel,products,producttyp){
-            var methodsession;
-            var objectIdCo;
-            var methodIdCo;
-            async.series([
-                function(callback){
-                    client.connect(endpointZiel,function(err){
-                        if(!err){
-                            callback();
-                        }else{
-                            console.log(err);
-                        }
-                    });
-                    
-                },
-                function(callback){
-                    client.createSession(function(err,session,){
-                        if(!err){
-                            methodsession = session;
-                            callback();
-                        }else{
-                            console.log(err);
-                        }
-                    }); 
-                },
-                function(callback){
-                    methodsession.call({
-                        objectId: "ns=2;s=Manifest",
-                        methodId: "ns=2;s=ManifestPort",
-                        inputArguments:[{
-                            name: "Header",
-                            dataType: "String",
-                            value: msgspec.Header.ORDER
-                        },{
-                            name: "Type",
-                            dataType: "String",
-                            value: msgspec.Type.COLLECTING
-                        },{
-                            name: "Content",
-                            dataType: "String",
-                            value: producttyp
-                        }]
-                    },function(err,result){
-                        methodIdCo = result.outputArguments[3].value;
-                        objectIdCo = result.outputArguments[4].value;
-                        callback();
-                    })
-                },  
-                function(callback){
-                    methodsession.call({
-                        objectId: objectIdCo,
-                        methodId: methodIdCo,
-                        inputArguments:[{
-                            name:"Productnumbers",
-                            dataType: opcua.DataType.Int32,
-                            arrayType:opcua.VariantArrayType.Array,
-                            valueRank:1,
-                            value: products.map(product => product.getComponentByName("Header").getComponentByName("Produktnummer").readValue().value.value)
-                        },{
-                            name: "Auftraggeber",
-                            dataType: opcua.DataType.String,
-                            value: Machine_2.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Auftraggeber").readValue().value.value
-                        },{
-                            name: "Auftragsnummer",
-                            dataType: opcua.DataType.Int32,
-                            value: Machine_2.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Header").getComponentByName("Auftragsnummer").readValue().value.value
-                        },{
-                            name: "BestellmengeA",
-                            dataType: opcua.DataType.Int32,
-                            value: Machine_2.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("BestellmengeA").readValue().value.value
-                        },{
-                            name: "BestellmengeB",
-                            dataType: opcua.DataType.Int32,
-                            value: Machine_2.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("BestellmengeB").readValue().value.value
-                        },{
-                            name: "BestellmengeC",
-                            dataType: opcua.DataType.Int32,
-                            value: Machine_2.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("BestellmengeC").readValue().value.value
-                        },]
-                    },function(err,result){
-                        if(!err){
-                            console.log("Senden von "+producttyp+" erfolgreich!");
-                            callback();
-                        }else{
-                            console.log(err);
-                        }
-                    });
-                },
-                function(callback){
-                    products.forEach(function(product){
-                        addressSpace.deleteNode(product);
-                    });
-                    if (!productionRuns){
-                        addressSpace.deleteNode(Machine_2.getComponentByName("Body").getComponentByName("CurrentAuftrag"));
+            });
+            var ProduktNummer = addressSpace.addVariable({
+                browseName: "Produktnummer",
+                dataType:"Int32",
+                nodeId:"ns=3;i=1"+produktnummer,
+                componentOf:Produkt.getComponentByName("Header"),
+                value:{
+                    get: function(){
+                        return new opcua.Variant({dataType:"Int32",value: produktnummer})
                     }
-                    callback();
-                },
-                function(callback){
-                    methodsession.close();
-                    client.disconnect();
-                    callback();
                 }
-            ]);
-        }
-
-//***** JS-Funktion zum Anlegen von Aufträgen */
-        function createAuftrag(auftraggeber, auftragsnummer,mengeA,mengeB,mengeC){
-            var Auftrag = AssetType.instantiate({
-                browseName: "CurrentAuftrag",
-                componentOf: Machine_2.getComponentByName("Body")
             });
 
-            var AuftragBody = addressSpace.addObject({
-                componentOf:Auftrag,
-                typeDefinition:folderType,
-                browseName: "Body"
+            var ProductLifecycle = addressSpace.addObject({
+                typeDefinition: folderType,
+                componentOf: Produkt.getComponentByName("Body"),
+                browseName: "ProductLifecycle"
             });
 
-            var Auftraggeber = addressSpace.addVariable({
-                componentOf: Auftrag.getComponentByName("Body"),
+            productLifecycle.forEach(function(process){                
+                var ProductionProcess = addressSpace.addObject({
+                    componentOf:ProductLifecycle,
+                    browseName: process
+                });
+                var numberInSequence = addressSpace.addVariable({
+                    browseName: "numberInSequence",
+                    propertyOf: ProductionProcess,
+                    dataType: "Int32",
+                    value: {
+                        get: function(){
+                            return new opcua.Variant({dataType: "Int32",value: productLifecycle.indexOf(process)});
+                        }
+                    }
+                });
+                var finished = addressSpace.addVariable({
+                    propertyOf: ProductionProcess,
+                    browseName: "finished",
+                    dataType: "Boolean",
+                    value: {
+                        get: function(){
+                            if (productLifecycle.indexOf(process)< productLifecycle.indexOf("Producing")){
+                                return new opcua.Variant({dataType: "Boolean",value: true});
+                            }else{
+                                return new opcua.Variant({dataType: "Boolean",value: false});
+                            }
+                        }
+                    }
+                })
+            });
+            var ProduktStatus = addressSpace.addVariable({
+                componentOf: Produkt.getComponentByName("Body"),
+                browseName: "ProduktStatus",
                 dataType: "String",
-                browseName: "Auftraggeber",
                 value:{
                     get: function(){
-                        return new opcua.Variant({dataType: "String", value: auftraggeber});
+                            return new opcua.Variant({dataType: "String", value: productstat.INPRODUCTION });
                     }
                 }
             });
 
-            var Auftragsnummer = addressSpace.addVariable({
-                componentOf: Auftrag.getComponentByName("Header"),
-                dataType: "Int32",
-                browseName: "Auftragsnummer",
-                value:{
-                    get: function(){
-                        return new opcua.Variant({dataType: "Int32", value: auftragsnummer});
-                    }
-                }
-            });
-
-            var BestellmengeA = addressSpace.addVariable({
-                componentOf: Auftrag.getComponentByName("Body"),
-                dataType: "Int32",
-                browseName: "BestellmengeA",
-                value:{
-                    get: function(){
-                        return new opcua.Variant({dataType: "Int32", value: mengeA});
-                    }
-                }
-            });
-            var BestellmengeB = addressSpace.addVariable({
-                componentOf: Auftrag.getComponentByName("Body"),
-                dataType: "Int32",
-                browseName: "BestellmengeB",
-                value:{
-                    get: function(){
-                        return new opcua.Variant({dataType: "Int32", value:mengeB});
-                    }
-                }
-            });
-            var BestellmengeC = addressSpace.addVariable({
-                componentOf: Auftrag.getComponentByName("Body"),
-                dataType: "Int32",
-                browseName: "BestellmengeC",
-                value:{
-                    get: function(){
-                        return new opcua.Variant({dataType: "Int32", value:mengeC});
-                    }
-                }
-            });
-            var Auftragsstatus = addressSpace.addVariable({
-                componentOf: Auftrag.getComponentByName("Body"),
-                dataType: "String",
-                browseName: "Auftragsstatus",
-                value:{
-                    get: function(){
-                        return new opcua.Variant({dataType: "String", value:auftragsstat.INPRODUCTION});
-                    },
-                    set: function(variant){
-                        auftragsstatus = variant.value;
-                        return opcua.StatusCodes.Good;
-                    }
-                }
-            });
-
-            var AuftragProduktordner = addressSpace.addObject({
-                componentOf:Auftrag.getComponentByName("Body"),
-                browseName: "Zugehoerige Produkte",
-                typeDefinition: folderType
-            })
+            return Produkt;
         }
+
 //***** Anlegen des Manifest Ports als OPCUA-Methode */
         ManifestPort = addressSpace.addMethod(Manifest,{
             browseName:"ManifestPort",
