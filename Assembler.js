@@ -36,8 +36,11 @@ function post_initialize() {
         var addressSpace = server.engine.addressSpace;
         var objectFolder = addressSpace.findNode("ns=0;i=85");
         var folderType = addressSpace.findNode("ns=0;i=61");
+
+        var outputCProducing = 0;
+        var processProductA = 0;
+        var processProductB = 0;
     
-        var produktnummer = 0;
 //****** Definition des abstrakten Typen AssetType        
         var AssetType = addressSpace.addObjectType({
             browseName: "AssetType"
@@ -175,15 +178,17 @@ function post_initialize() {
             }
         });
 //****** Spezifikation der Monitoring Capability
-        var ProduktCMonitoring = addressSpace.addObject({
-            browseName: producttypes.C,
-            componentOf: Monitoring
-        });
 
         var Production = addressSpace.addObject({
             browseName: "Production",
             componentOf:Monitoring
         });
+        ProductionAvailability.addReference({referenceType: "OrganizedBy",nodeId:Production});
+        var ProcessingMonitoring = addressSpace.addObject({
+            browseName: "Processing",
+            componentOf: Monitoring
+        })
+        ProcessingAvailability.addReference({referenceType: "OrganizedBy",nodeId: Production});
        
 //****** Spezifikation der Showing Capability
         var Light = addressSpace.addObject({
@@ -227,7 +232,6 @@ function post_initialize() {
                 }
             }
         });
-        TimeToManufacture.addReference({referenceType: "OrganizedBy",nodeId: ProduktCMonitoring});
         var productType = addressSpace.addVariable({
             browseName: "ProduktTyp",
             propertyOf: ProduktC,
@@ -243,22 +247,11 @@ function post_initialize() {
             propertyOf: ProduktC,
             typeDefinition: folderType
         });
-        Input.addReference({referenceType:"OrganizedBy",nodeId: ProduktCMonitoring});
         var ProduktA = addressSpace.addObject({
             browseName : producttypes.A,
             organizedBy : Input,
         });
-        var NumberA = addressSpace.addVariable({
-            browseName: "Number",
-            dataType: "Int32",
-            propertyOf: ProduktA,
-            value: {
-                get: function(){
-                    return new opcua.Variant({dataType: "Int32", value: 2});
-                }
-            }
-        });
-
+        
         var productTypeA = addressSpace.addVariable({
             browseName: "ProduktTyp",
             propertyOf: ProduktA,
@@ -273,16 +266,6 @@ function post_initialize() {
         var ProduktB = addressSpace.addObject({
             browseName : producttypes.B,
             organizedBy : Input,
-        });
-        var NumberB = addressSpace.addVariable({
-            browseName: "Number",
-            dataType: "Int32",
-            propertyOf: ProduktB,
-            value: {
-                get: function(){
-                    return new opcua.Variant({dataType: "Int32", value: 1});
-                }
-            }
         });
         var productTypeB = addressSpace.addVariable({
             browseName: "ProduktTyp",
@@ -757,20 +740,16 @@ function post_initialize() {
     
 //****** Anlegen Output Variable für ProduktC
         var Output = addressSpace.addVariable({
-            browseName:"Output",
+            browseName:"OutputC",
             dataType: "Int32",
-            propertyOf: Assembler.getComponentByName("Header"),
+            propertyOf: Assembler.getComponentByName("Body"),
             value:{
                 get: function(){
-                    try{
-                        return new opcua.Variant({dataType: "Int32", value: Assembler.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements().filter(element => element.getComponentByName("Header").getComponentByName("ProduktTyp").readValue().value.value === producttypes.C).length});
-                    }catch(err){
-                        return new opcua.Variant({dataType: "Int32", value: 0});
-                    }
+                    return new opcua.Variant({dataType: "Int32", value: outputCProducing})
                 }
             }
         });
-        Output.addReference({referenceType:"OrganizedBy",nodeId: ProduktCMonitoring});        
+        Output.addReference({referenceType:"OrganizedBy",nodeId: Production});        
 
 //****** Instanziieren des Displays */
 
@@ -976,59 +955,79 @@ function post_initialize() {
             }
         })
 
-//****** OPCUA-Methode um Node-Ids der ProduktC Monitoring  zurückzugeben*/
-        var ProvideProductCData = addressSpace.addMethod(Assembler.getComponentByName("Body"),{
-            browseName: "ProvideProductCData",
-            nodeId: "ns=2;s=ProvideProductCData",
+//****** OPCUA- Variablen zum Zählen der Anzahl der Produkte die geprocessed wurden */
+
+        //Produkt A
+        var OutputProductAProcessing = addressSpace.addVariable({
+            propertyOf: Assembler.getComponentByName("Body"),
+            dataType: "Int32",
+            browseName: "ProcessedProductA",
+            value: {
+                get: function(){
+                    return new opcua.Variant({dataType: "Int32", value: processProductA});
+                }
+            }
+        });
+        OutputProductAProcessing.addReference({referenceType: "OrganizedBy", nodeId: ProcessingMonitoring});
+
+        //Produkt B
+        var OutputProductBProcessing = addressSpace.addVariable({
+            propertyOf: Assembler.getComponentByName("Body"),
+            dataType: "Int32",
+            browseName: "ProcessedProductB",
+            value: {
+                get: function(){
+                    return new opcua.Variant({dataType: "Int32", value: processProductB});
+                }
+            }
+        });
+        OutputProductBProcessing.addReference({referenceType: "OrganizedBy", nodeId: ProcessingMonitoring});
+
+
+//****** OPCUA-Methode um Node-Id der ProcessingDaten zurückzugeben */
+        var ProvideProcessingData = addressSpace.addMethod(Assembler.getComponentByName("Body"),{
+            browseName: "ProvideProcessingData",
+            nodeId: "ns=2;s=ProvideProcessingData",
             modellingRule: "Mandatory",
             outputArguments:[{
-                name: "TimeToManufacture",
-                dataType:"String"
-            },{
-                name: "Outputgoal",
+                name: "ProcessingAvailability",
                 dataType: "String"
             },{
-                name: "Output",
+                name: "OutputAProcess",
                 dataType: "String"
             },{
-                name: "AperC",
-                dataType: "String"
-            },{
-                name: "BperC",
+                name: "OutputBProcess",
                 dataType: "String"
             }]
         });
+        ProvideProcessingData.addReference({referenceType:"OrganizedBy",nodeId: ProcessingMonitoring});
 
-        ProvideProductCData.addReference({referenceType: "OrganizedBy",nodeId:ProduktCMonitoring});
-
-        ProvideProductCData.bindMethod(function(inputArguments,context,callback){
+        ProvideProcessingData.bindMethod(function(inputArguments,context,callback){
             callback(null,{
                 statusCode: opcua.StatusCodes.Good,
                 outputArguments:[{
                     dataType: "String",
-                    value: TimeToManufacture.nodeId.toString()
+                    value: ProcessingAvailability.nodeId.toString()
                 },{
                     dataType: "String",
-                    value: OutputGoal.nodeId.toString()
-                },{
-                    dataType:"String",
-                    value: Output.nodeId.toString()
+                    value: OutputProductAProcessing.nodeId.toString()
                 },{
                     dataType: "String",
-                    value: NumberA.nodeId.toString()
-                },{
-                    dataType:"String",
-                    value: NumberB.nodeId.toString()
+                    value: OutputProductBProcessing.nodeId.toString()
                 }]
             });
         });
-//****** OPCUA-Methode um Node-Id der Production-Runs */
+
+//****** OPCUA-Methode um Node-Id der Produktions Daten zurückzugeben */
         var ProvideProductionData = addressSpace.addMethod(Assembler.getComponentByName("Body"),{
             browseName: "ProvideProductionData",
             nodeId: "ns=2;s=ProvideProduction",
             modellingRule: "Mandatory",
             outputArguments:[{
-                name: "ProductionRuns",
+                name: "ProductionAvailability",
+                dataType: "String"
+            },{
+                name: "OutputC",
                 dataType: "String"
             }]
         });
@@ -1040,13 +1039,17 @@ function post_initialize() {
                 outputArguments:[{
                     dataType: "String",
                     value: ProductionAvailability.nodeId.toString()
+                },{
+                    dataType: "String",
+                    value: Output.nodeId.toString()
                 }]
             });
-        })
+        });
+
 //****** OPCUA - Methode um A und B zu processen */
 
         //ProduktA
-        var processProductA = addressSpace.addMethod(Assembler.getComponentByName("Body"),{
+        var ProcessProductA = addressSpace.addMethod(Assembler.getComponentByName("Body"),{
             browseName:"ProcessProductA",
             nodeId: "ns=2;s=ProcessProductA",
             modellingRule: "Mandatory",
@@ -1068,9 +1071,9 @@ function post_initialize() {
              }]
         });
 
-        processProductA.addReference({referenceType: "OrganizedBy", nodeId: ProduktAProcessing});
+        ProcessProductA.addReference({referenceType: "OrganizedBy", nodeId: ProduktAProcessing});
 
-        processProductA.bindMethod(function(inputArguments,context,callback){
+        ProcessProductA.bindMethod(function(inputArguments,context,callback){
             var produktNummer = inputArguments[0].value;
             var productLifecycle = inputArguments[1].value;
             var currentProduct = createProduct(produktNummer, productLifecycle,producttypes.A);
@@ -1090,13 +1093,15 @@ function post_initialize() {
                     value: produktNumberToSend
                 }]
             });
+            //Erhöhen entsprechender Variable
+            processProductA++;
 
             
         });
 
         //ProduktB
 
-        var processProductB = addressSpace.addMethod(Assembler.getComponentByName("Body"),{
+        var ProcessProductB = addressSpace.addMethod(Assembler.getComponentByName("Body"),{
             browseName:"ProcessProductB",
             nodeId: "ns=2;s=ProcessProductB",
             modellingRule: "Mandatory",
@@ -1118,9 +1123,9 @@ function post_initialize() {
              }]
         });
 
-        processProductB.addReference({referenceType: "OrganizedBy", nodeId: ProduktBProcessing});
+        ProcessProductB.addReference({referenceType: "OrganizedBy", nodeId: ProduktBProcessing});
 
-        processProductB.bindMethod(function(inputArguments,context,callback){
+        ProcessProductB.bindMethod(function(inputArguments,context,callback){
             var produktNummer = inputArguments[0].value;
             var productLifecycle = inputArguments[1].value;
             var currentProduct = createProduct(produktNummer, productLifecycle,producttypes.B);
@@ -1140,6 +1145,8 @@ function post_initialize() {
                     value: produktNumberToSend
                 }]
             });
+            //Ehöhen entsprechender Variable
+            processProductB++;
 
             
         });
@@ -1276,6 +1283,8 @@ function post_initialize() {
                                 value: 0
                             }]
                         });
+                        //Erhöhen der OutputC Variable
+                        outputCProducing++;
                         console.log("Production of Product "+currentProduct.getComponentByName("Header").getComponentByName("Produktnummer").readValue().value.value+" finished");
                         addressSpace.deleteNode(currentProduct);
                         productionAvailability = true;

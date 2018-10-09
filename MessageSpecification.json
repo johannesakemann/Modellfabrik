@@ -22,7 +22,8 @@
             "B":"ProduktB",
             "C":"ProduktC",
             "PRODUCTION": "Production",
-            "ORDER":"Order"
+            "ORDER":"Order",
+            "PROCESSING": "Processing"
         },
         "Producing":{
             "A":"ProduktA",

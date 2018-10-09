@@ -40,8 +40,9 @@ function post_initialize() {
 
 //***** JS Variablen zu OPCUA-Variablen        
         var temperature_1 = 1.0;
-        var produktnr = 1;
-        var productionRuns = false;
+        var outputA = 0;
+        var outputB = 0;
+        
         var timeToManufactureA = 10;
         var timeToManufactureB = 5;
         var overheatingTemperature = 26;
@@ -159,6 +160,7 @@ function post_initialize() {
                 }
             }
         });
+        
 
         // ProduktA
         var ProduktA = addressSpace.addObject({
@@ -228,42 +230,17 @@ function post_initialize() {
             browseName: "Temperature",
             componentOf: Monitoring
         });
-        var ProduktAMonitoring = addressSpace.addObject({
-            browseName: "ProduktA",
-            componentOf: Monitoring
-        });
-        TimeToManufactureA.addReference({referenceType:"OrganizedBy",nodeId:ProduktAMonitoring});
-        var ProduktBMonitoring = addressSpace.addObject({
-            browseName: "ProduktB",
-            componentOf: Monitoring
-        });
-        TimeToManufactureB.addReference({referenceType:"OrganizedBy",nodeId:ProduktBMonitoring});
         var Produktion = addressSpace.addObject({
             browseName: "Production",
             componentOf: Monitoring
         });
+        ProductionAvailability.addReference({referenceType: "OrganizedBy",nodeId: Produktion});
 
 //***** Spezifikation der Showing Capability
         var Light = addressSpace.addObject({
             browseName:"Light",
             componentOf:Showing
         });    
-//***** Machine1 -- Production Runs*/
-        var ProductionRuns = addressSpace.addVariable({
-            browseName: "ProductionRuns",
-            dataType: "Boolean",
-            propertyOf: Machine_2.getComponentByName("Body"),
-            value:{
-                get: function(){
-                    return new opcua.Variant({dataType: "Boolean", value:productionRuns});
-                },
-                set: function(variant){
-                    productionRuns = variant.value;
-                    return opcua.StatusCodes.Good;
-                }
-            }
-        });
-        ProductionRuns.addReference({referenceType: "OrganizedBy",nodeId: Produktion});
 
 //***** Instanzieren Temperatursensor       
         var TemperatureSensor = AssetType.instantiate({
@@ -277,8 +254,6 @@ function post_initialize() {
             componentOf: TemperatureSensor,
             typeDefinition: folderType
         });
-        
-
         var TemperatureSensorManufacturer = addressSpace.addVariable({
             browseName: "Manufacturer",
             propertyOf: TemperatureSensor.getComponentByName("Header"),
@@ -420,7 +395,7 @@ function post_initialize() {
 
         SafeShutdown.bindMethod(function(inputArgumens,context,callback){
             //Zunächst beenden der Produktion --> führt auch zum senden der Produkte an die nächste Instanz
-            productionRuns = false;
+            productionAvailability = false;
             //Aufrufen der remove Methode in der Fabrik --> entfernen des Devices + letzter Status der übergeben wird.
             var unregistersession;
             var unregisterMethodId;
@@ -594,7 +569,7 @@ function post_initialize() {
             componentOf: LED.getComponentByName("Body"),
             value:{
                 get: function(){
-                    return new opcua.Variant({dataType: "Int32", value:help.transformFabrikPowerToLEDPower(productionRuns)});
+                    return new opcua.Variant({dataType: "Int32", value:help.transformFabrikPowerToLEDPower(productionAvailability)});
                 }
             }
         });
@@ -630,17 +605,11 @@ function post_initialize() {
             propertyOf: Machine_2.getComponentByName("Body"),
             value:{
                 get: function(){
-                    try{
-                        return new opcua.Variant({dataType: "Int32", value:Machine_2.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements().filter(produkt => produkt.getComponentByName("Header").getComponentByName("ProduktTyp").readValue().value.value === producttypes.A).length});        
-                    }catch(err){
-                        return new opcua.Variant({dataType: "Int32", value:0});
-                    }
-                    
-                }
+                        return new opcua.Variant({dataType: "Int32", value: outputA});
+                    }                    
             }
         });
-        OutputA.addReference({referenceType: "OrganizedBy",nodeId: ProduktAMonitoring});
-        
+        OutputA.addReference({referenceType: "OrganizedBy",nodeId: Produktion});
 
         var OutputB = addressSpace.addVariable({
             browseName: "OutputB",
@@ -649,16 +618,11 @@ function post_initialize() {
             propertyOf: Machine_2.getComponentByName("Body"),
             value:{
                 get: function(){
-                    try{
-                        return new opcua.Variant({dataType: "Int32", value:Machine_2.getComponentByName("Body").getComponentByName("CurrentAuftrag").getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements().filter(produkt => produkt.getComponentByName("Header").getComponentByName("ProduktTyp").readValue().value.value === producttypes.B).length});        
-                    }catch(err){
-                        return new opcua.Variant({dataType: "Int32", value:0});
-                    }
-                    
+                   return new opcua.Variant({dataType: "Int32",value:outputB});
                 }
             }
         });
-        OutputB.addReference({referenceType: "OrganizedBy",nodeId: ProduktBMonitoring});
+        OutputB.addReference({referenceType: "OrganizedBy",nodeId: Produktion});
 
 //***** OPCUA-Methode zur Erstellung des ProduktsA */
         var ProduceProductA = addressSpace.addMethod(Machine_2.getComponentByName("Body"),{
@@ -705,6 +669,8 @@ function post_initialize() {
                         }
                     ]
                 });
+                //Erhöhen der OutputA Variable
+                outputA++;
                 console.log("Production of ProductA "+produktNumber+ " is finished");
                 //Nach der Produktion Availability der Produktionscapability wieder auf true setzen
                 productionAvailability = true;
@@ -758,6 +724,8 @@ function post_initialize() {
                         }
                     ]
                 });
+                //Erhöhen OutputB Variable
+                outputB++;
                 console.log("Production of ProductB "+produktNumber+ " is finished");
                 //Nach der Produktion Availability der Produktionscapability wieder auf true setzen
                 productionAvailability = true;
@@ -767,71 +735,7 @@ function post_initialize() {
         });
 
 
-//***** OPCUA-Methode um Node-Ids der Informationen von ProduktA zu übermitteln */
-        var ProvideDataOfProductA = addressSpace.addMethod(Machine_2.getComponentByName("Body"),{
-            browseName: "ProvideDataOfProductA",
-            modellingRule: "Mandatory",
-            nodeId: "ns=2;s=ProvideDataOfProductA",
-            inputArguments:[],
-            outputArguments:[
-                {
-                    name:"TimeToManufacture",
-                    dataType: "String"   
-                },{
-                    name: "OutputA",
-                    dataType: "String"
-                }
-            ]
-        });
-        ProvideDataOfProductA.addReference({referenceType:"OrganizedBy",nodeId:ProduktAMonitoring});
-        ProvideDataOfProductA.bindMethod(function(inputArgumens,context,callback){
-            callback(null,{
-                statusCode: opcua.StatusCodes.Good,
-                outputArguments:[
-                    {
-                        dataType: "String",
-                        value: TimeToManufactureA.nodeId.toString()
-                    },{
-                        dataType: "String",
-                        value: OutputA.nodeId.toString()
-                    }
-                ]
-            })
-        });
-//***** OPCUA-Methode um Node-Ids der Informationen von ProduktB zu übermitteln */
-        var ProvideDataOfProductB = addressSpace.addMethod(Machine_2.getComponentByName("Body"),{
-            browseName: "ProvideDataOfProductB",
-            modellingRule: "Mandatory",
-            nodeId: "ns=2;s=ProvideDataOfProductB",
-            inputArguments:[],
-            outputArguments:[
-                {
-                    name:"TimeToManufacture",
-                    dataType: "String"   
-                },{
-                    name: "OutputB",
-                    dataType: "String"
-                }
-            ]
-        });
-        ProvideDataOfProductB.addReference({referenceType:"OrganizedBy",nodeId:ProduktBMonitoring});
-        ProvideDataOfProductB.bindMethod(function(inputArgumens,context,callback){
-            callback(null,{
-                statusCode: opcua.StatusCodes.Good,
-                outputArguments:[
-                    {
-                        dataType: "String",
-                        value: TimeToManufactureB.nodeId.toString()
-                    },{
-                        dataType: "String",
-                        value: OutputB.nodeId.toString()
-                    }
-                ]
-            })
-        });
-
-
-//***** OPCUA-Methode um Node Id der Production Runs  Variable zu liefern*/
+//***** OPCUA-Methode um Node Id der Produktionsdaten  Variable zu liefern*/
         var ProvideProductionData = addressSpace.addMethod(Machine_2.getComponentByName("Body"),{
             browseName: "ProvideProductionData",
             modellingRule: "Mandatory",
@@ -839,8 +743,15 @@ function post_initialize() {
             inputArguments:[],
             outputArguments:[
                 {
-                    name:"ProductionRuns",
+                    name:"ProductionAvailability",
                     dataType: "String"   
+                },
+                {
+                    name: "OutputA",
+                    dataType: "String"
+                },{
+                    name: "OutputB",
+                    dataType: "String"
                 }
             ]
         });
@@ -851,7 +762,13 @@ function post_initialize() {
                 outputArguments:[
                     {
                         dataType: "String",
-                        value: ProductionRuns.nodeId.toString()
+                        value: ProductionAvailability.nodeId.toString()
+                    },{
+                        dataType: "String",
+                        value: OutputA.nodeId.toString()
+                    },{
+                        dataType: "String",
+                        value: OutputB.nodeId.toString()
                     }
                 ]
             })
