@@ -339,8 +339,6 @@ function post_initialize() {
                     var produkts =  Producing.getComponents().filter(produkt => produkt.getPropertyByName("ProduktTyp").readValue().value.value === producttypeRequested);
                     if(produkts.length > 0){
                         var input = produkts[0].getPropertyByName("Input").getFolderElements().map(element => element.getPropertyByName("ProduktTyp").readValue().value.value);
-                        var inputNumbers = produkts[0].getPropertyByName("Input").getFolderElements().map(element => element.getPropertyByName("Number").readValue().value.value);
-                        
                         callback(null,{
                             statusCode: opcua.StatusCodes.Good,
                             outputArguments:[
@@ -356,7 +354,7 @@ function post_initialize() {
                                     dataType: "Int32",
                                     arrayType: opcua.VariantArrayType.Array,
                                     valueRank:1,
-                                    value: inputNumbers
+                                    value: 0
                                 },{
                                     dataType:"String",
                                     value: "0"
