@@ -1090,6 +1090,7 @@ function post_initialize() {
         })
         startProduction.bindMethod(function(inputArguments,context,callback){
             var currAuftrag = addressSpace.findNode(getCurrentAuftrag());
+            console.log("Production started!")
             
             function produce(){
                 var produktsCurrAuftrag = currAuftrag.getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements();
