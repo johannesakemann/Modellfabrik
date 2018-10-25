@@ -1202,7 +1202,7 @@ function post_initialize() {
                     function(callback){
                         requestClient.connect(currMachineEndpoint,function(err){
                             if(!err){
-                                //console.log("Connected to "+bestProduction[element]);
+                                console.log("Connected to "+bestProduction[element]+" in Order to request TimeToManufacture");
                                 callback();
                             }else{
                                 console.log(err);
@@ -1240,7 +1240,7 @@ function post_initialize() {
                             if(!err){
                                 currMachineTime = result.outputArguments[0].value;
                                 counterMachines++;
-                                //console.log("Zeit von "+currMachineEndpoint+": "+currMachineTime);
+                                console.log("Zeit von "+currMachineEndpoint+": "+currMachineTime);
                                 if (currMachineTime < bestMachineProdTime){
                                     bestMachineforCap = machine;
                                     bestMachineProdTime = currMachineTime;
