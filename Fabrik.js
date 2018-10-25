@@ -1090,6 +1090,7 @@ function post_initialize() {
         })
         startProduction.bindMethod(function(inputArguments,context,callback){
             var currAuftrag = addressSpace.findNode(getCurrentAuftrag());
+            console.log("Production started!")
             
             function produce(){
                 var produktsCurrAuftrag = currAuftrag.getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements();
@@ -1105,6 +1106,7 @@ function post_initialize() {
                         return;
                     }
                     getBestMaschineCurrentCap(produkt,function(bestMachine){
+                        //console.log(bestMachine);
                         if(bestMachine === 0){
                             //TODO: Throw some error
                             return;
@@ -1177,7 +1179,7 @@ function post_initialize() {
         function getBestMaschineCurrentCap(produkt, fn){
             var aktCap = getCurrentCapability(produkt);
             var availableMachinesforCap = aktCap.getFolderElements();
-            //console.log(availableMachinesforCap);
+            console.log(availableMachinesforCap);
             var counterMachines =0;
             //TODO: Statusänderung des Produktes wenn es keine Maschinen gibt, die die Capability bearbeiten können
             if (availableMachinesforCap.length === 0){
@@ -1192,7 +1194,8 @@ function post_initialize() {
             var bestMachineforCap = availableMachinesforCap[0];
             var bestMachineProdTime = Number.MAX_VALUE;            
             availableMachinesforCap.forEach(function(machine){
-                var currMachineEndpoint = machine.getComponentByName("Header").getPropertyByName("Adresse").readValue().value.value;                    
+                var currMachineEndpoint = machine.getComponentByName("Header").getPropertyByName("Adresse").readValue().value.value;
+                //console.log("Next Machine to request TtM: "+currMachineEndpoint);
                 var currMachineTime;
                 var requestsession;
                 var requestClient = new opcua.OPCUAClient();
@@ -1201,7 +1204,7 @@ function post_initialize() {
                     function(callback){
                         requestClient.connect(currMachineEndpoint,function(err){
                             if(!err){
-                                //console.log("Connected to "+bestProduction[element]);
+                                //console.log("Connected to "+currMachineEndpoint+" in Order to request TimeToManufacture");
                                 callback();
                             }else{
                                 console.log(err);
