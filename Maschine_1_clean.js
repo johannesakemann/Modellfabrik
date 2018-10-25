@@ -673,7 +673,7 @@ function post_initialize() {
                     ]
                 });
                 //Erhöhen der OutputB Variable
-                outputB++;
+                outputA++;
                 console.log("Production of ProductA "+produktNumber+ " is finished");
                 //Nach der Produktion Availability der Produktionscapability wieder auf true setzen
                 productionAvailability = true;
