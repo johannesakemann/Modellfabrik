@@ -1178,7 +1178,7 @@ function post_initialize() {
         function getBestMaschineCurrentCap(produkt, fn){
             var aktCap = getCurrentCapability(produkt);
             var availableMachinesforCap = aktCap.getFolderElements();
-            //console.log(availableMachinesforCap);
+            console.log(availableMachinesforCap);
             var counterMachines =0;
             //TODO: Statusänderung des Produktes wenn es keine Maschinen gibt, die die Capability bearbeiten können
             if (availableMachinesforCap.length === 0){
