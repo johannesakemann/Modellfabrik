@@ -1106,7 +1106,7 @@ function post_initialize() {
                         return;
                     }
                     getBestMaschineCurrentCap(produkt,function(bestMachine){
-                        console.log(bestMachine);
+                        //console.log(bestMachine);
                         if(bestMachine === 0){
                             //TODO: Throw some error
                             return;
@@ -1195,7 +1195,7 @@ function post_initialize() {
             var bestMachineProdTime = Number.MAX_VALUE;            
             availableMachinesforCap.forEach(function(machine){
                 var currMachineEndpoint = machine.getComponentByName("Header").getPropertyByName("Adresse").readValue().value.value;
-                console.log("Next Machine to request TtM: "+currMachineEndpoint);
+                //console.log("Next Machine to request TtM: "+currMachineEndpoint);
                 var currMachineTime;
                 var requestsession;
                 var requestClient = new opcua.OPCUAClient();
@@ -1204,7 +1204,7 @@ function post_initialize() {
                     function(callback){
                         requestClient.connect(currMachineEndpoint,function(err){
                             if(!err){
-                                console.log("Connected to "+currMachineEndpoint+" in Order to request TimeToManufacture");
+                                //console.log("Connected to "+currMachineEndpoint+" in Order to request TimeToManufacture");
                                 callback();
                             }else{
                                 console.log(err);
@@ -1242,7 +1242,7 @@ function post_initialize() {
                             if(!err){
                                 currMachineTime = result.outputArguments[0].value;
                                 counterMachines++;
-                                console.log("Zeit von "+currMachineEndpoint+": "+currMachineTime);
+                                //console.log("Zeit von "+currMachineEndpoint+": "+currMachineTime);
                                 if (currMachineTime < bestMachineProdTime){
                                     bestMachineforCap = machine;
                                     bestMachineProdTime = currMachineTime;
