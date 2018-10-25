@@ -1106,6 +1106,7 @@ function post_initialize() {
                         return;
                     }
                     getBestMaschineCurrentCap(produkt,function(bestMachine){
+                        console.log(bestMachine);
                         if(bestMachine === 0){
                             //TODO: Throw some error
                             return;
