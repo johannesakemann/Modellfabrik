@@ -1202,7 +1202,7 @@ function post_initialize() {
                     function(callback){
                         requestClient.connect(currMachineEndpoint,function(err){
                             if(!err){
-                                console.log("Connected to "+bestProduction[element]+" in Order to request TimeToManufacture");
+                                console.log("Connected to "+currMachineEndpoint+" in Order to request TimeToManufacture");
                                 callback();
                             }else{
                                 console.log(err);
