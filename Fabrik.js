@@ -90,7 +90,14 @@ function post_initialize() {
             componentOf: Monitoring
         });
 
+        var DeviceMonitoring = addressSpace.addObject({
+            browseName: "Device",
+            componentOf: Monitoring
+        })
+
 //****** OPCUA-Methode um Node Ids der aktuellen Auftragsdaten zurückzugeben */
+        //TODO: Löschen wenns passt 
+        /*
         var ProvideCurrOrderData = addressSpace.addMethod(Fabrik.getComponentByName("Body"),{
             modellingRule: "Mandatory",
             browseName: "ProvideCurrentOrderData",
@@ -127,7 +134,7 @@ function post_initialize() {
                     value: CurrentOrderVolumeC.nodeId.toString()
                 }]
             });
-        });
+        });*/
 //****** Anlegen Device Management Capability */
         var DeviceManagement = addressSpace.addObject({
             browseName: capabilities.DEVICEMANAGEMENT,
@@ -439,7 +446,7 @@ function post_initialize() {
             }
         });
 //****** Variablen zum Anzeigen aktueller Auftragsdaten */
-
+        /*
         var CurrentOrderNumber = addressSpace.addVariable({
             componentOf: Fabrik.getComponentByName("Body"),
             dataType: "String",
@@ -514,7 +521,7 @@ function post_initialize() {
                     return new opcua.Variant({dataType: "Boolean",value :auftragFinished});
                 }
             }
-        })
+        })*/
 //****** Methode zum Anlegen von Aufträgen */
 
         var createAuftrag = addressSpace.addMethod(Fabrik.getComponentByName("Body"), {
@@ -1771,6 +1778,62 @@ function post_initialize() {
         });
         OrderStatus.addReference({referenceType:"OrganizedBy",nodeId:OrderMonitoring});
         
+//**** Methode um Devices zu monitoren */
+        var ProvideDeviceData = addressSpace.addMethod(Fabrik.getComponentByName("Body"),{
+            modellingRule: "Mandatory",
+            browseName: "ProvideDeviceData",
+            inputArguments:[],
+            outputArguments:[{
+                dataType:"String",
+                name: "DeviceTyp"
+            },{
+                dataType: "String",
+                name: "DeviceIDs"
+            }]
+        })
+        ProvideDeviceData.addReference({referenceType: "OrganizedBy",nodeId: DeviceMonitoring});
+        ProvideDeviceData.bindMethod(function(inputArguments,context,callback){
+            callback({
+                statusCode: opcua.StatusCodes.Good,
+                outputArguments:[{
+                    dataType: "String",
+                    value: DeviceTypes.nodeId.toString()
+                },{
+                    dataType: "String",
+                    value: DeviceIds.nodeId.toString()
+                }]
+            })
+        });
+
+//***** Variablen um DeviceDaten Anzuzeigen */     
+        var DeviceTypes = addressSpace.addVariable({
+            browseName: "DeviceTypes",
+            componentOf: Fabrik.getComponentByName("Body"),
+            arrayType: opcua.VariantArrayType.Array,
+            dataType: "String",
+            value:{
+                get: function(){
+                    var valueToReturn = Geraeteordner.getFolderElements().map(e => e.getComponentByName("Header").getComponentByName("GeraeteTyp").readValue().value.value);
+                    return new opcua.Variant({dataType: "String", arrayType: opcua.VariantArrayType.Array, value: valueToReturn});
+                }
+            }
+        });
+        DeviceTypes.addReference({referenceType: "OrganizedBy",nodeId: DeviceMonitoring});
+
+        var DeviceIds = addressSpace.addVariable({
+            browseName: "DeviceIds",
+            componentOf: Fabrik.getComponentByName("Body"),
+            arrayType: opcua.VariantArrayType.Array,
+            dataType: "Int32",
+            value:{
+                get: function(){
+                    var valueToReturn = Geraeteordner.getFolderElements().map(e => e.getComponentByName("Header").getPropertyByName("SerialNumber").readValue().value.value);
+                    return new opcua.Variant({dataType: "Int32", arrayType: opcua.VariantArrayType.Array, value: valueToReturn});
+                }
+            }
+        });
+        DeviceIds.addReference({referenceType: "OrganizedBy",nodeId: DeviceMonitoring});
+
     }
 
 //****** Servererstellung */
