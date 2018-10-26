@@ -1686,7 +1686,7 @@ function post_initialize() {
             ]
         });
         ProvideOrderData.bindMethod(function(inputArguments,context,callback){
-            callback({
+            callback(null,{
                 statusCode: opcua.StatusCodes.Good,
                 outputArguments:[{
                     dataType: "String",
@@ -1705,7 +1705,7 @@ function post_initialize() {
                     value: OrderProductCs.nodeId.toString()
                 }]
             })
-        })
+        });
         ProvideOrderData.addReference({referenceType:"OrganizedBy",nodeId:OrderMonitoring});
 
 
@@ -1793,7 +1793,7 @@ function post_initialize() {
         })
         ProvideDeviceData.addReference({referenceType: "OrganizedBy",nodeId: DeviceMonitoring});
         ProvideDeviceData.bindMethod(function(inputArguments,context,callback){
-            callback({
+            callback(null,{
                 statusCode: opcua.StatusCodes.Good,
                 outputArguments:[{
                     dataType: "String",
