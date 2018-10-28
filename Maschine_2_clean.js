@@ -883,6 +883,8 @@ function post_initialize() {
                         //console.log(err);
                         if(err){
                             console.log("Error during methodCall of register Method: "+err);
+                        }else{
+                            console.log("Maschine2 registriert!");
                         }
                         callback(err);
                     });
@@ -897,8 +899,6 @@ function post_initialize() {
         });
         callCreateObject.execute([],new opcua.SessionContext(),function(err,result){
             if(!err){
-                console.log("Maschine_2 registriert!");
-            }else{
                 console.log(err);
             }
         })
