@@ -10,6 +10,8 @@ var auftragsstat = require('./AuftragsStatus.json');
 var capabilities = require('./capabilities.json');
 var msgspec = require('./MessageSpecification.json');
 var productstat = require('./productstatus.json');
+var shell = require('shelljs');
+
 //Creation of an instance of OPCUAServer
 var server = new opcua.OPCUAServer({
     port: 4335, // the port of the listening socket of the server
@@ -1280,7 +1282,7 @@ function post_initialize() {
                             if(err) {
                                 console.log(" cannot connect to endpoint :" , endpointFabrik );
                                 console.log(err);
-                            }else{                                
+                            }else{
                                 callback(err);
                             }
                         }); 
@@ -1398,7 +1400,7 @@ function post_initialize() {
             var ProduktType = addressSpace.addVariable({
                 browseName: "ProduktTyp",
                 componentOf: Produkt.getComponentByName("Header"),
-                nodeId:"ns=3;i=2"+produktnummer,
+                nodeId:"ns=3;i=200"+produktnummer,
                 dataType:"String",
                 value:{
                     get: function(){
@@ -1409,7 +1411,7 @@ function post_initialize() {
             var ProduktNummer = addressSpace.addVariable({
                 browseName: "Produktnummer",
                 dataType:"Int32",
-                nodeId:"ns=3;i=1"+produktnummer,
+                nodeId:"ns=3;i=100"+produktnummer,
                 componentOf:Produkt.getComponentByName("Header"),
                 value:{
                     get: function(){
@@ -1479,3 +1481,5 @@ function post_initialize() {
     });
 }
 server.initialize(post_initialize);
+
+shell.exec("node-red-start");

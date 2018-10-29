@@ -8,6 +8,7 @@ var producttypes = require('./producttypes.json');
 var capabilities = require('./capabilities.json');
 var msgspec = require('./MessageSpecification.json');
 var productstat = require('./productstatus.json');
+var shell = require('shelljs');
 
 var server = new opcua.OPCUAServer({
     port: 4337, // the port of the listening socket of the server
@@ -1889,3 +1890,4 @@ function post_initialize() {
     });
 }
 server.initialize(post_initialize);
+shell.exec("node-red-start");

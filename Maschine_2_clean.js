@@ -12,6 +12,7 @@ var auftragsstat = require('./AuftragsStatus.json');
 var capabilities = require('./capabilities.json');
 var msgspec = require('./MessageSpecification.json');
 var productstat = require('./productstatus.json');
+var shell = require('shelljs');
 
 var client =  new opcua.OPCUAClient({endpoint_must_exist:false});
 var server = new opcua.OPCUAServer({
@@ -490,6 +491,8 @@ function post_initialize() {
                     callback();
                 }
             ]);
+            //Herunterfahren node-red
+            shell.exec("node-red-stop");
             //Herunterfahren des Servers.
             server.shutdown(10000,function(err){
                 if (!err){
@@ -1461,4 +1464,4 @@ function post_initialize() {
     });
 }
 server.initialize(post_initialize);
-
+shell.exec("node-red");
