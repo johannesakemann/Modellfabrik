@@ -101,7 +101,6 @@ function post_initialize() {
         })
 
 //****** OPCUA-Methode um Node Ids der aktuellen Auftragsdaten zurückzugeben */
-        //TODO: Löschen wenns passt 
         
         var ProvideCurrOrderData = addressSpace.addMethod(Fabrik.getComponentByName("Body"),{
             modellingRule: "Mandatory",
@@ -1412,6 +1411,14 @@ function post_initialize() {
         //Hilfsmethodik, die den nächsten Schritt im PLC auf done setzt & den ProduktStatus wieder auf "WAITING".
         //@param: Produkt
         function markCurrentCapabilityAsDone(produkt,response){
+            //check if current Order is now done
+            var currAuftrag = addressSpace.findNode(getCurrentAuftrag());
+            var produktsCurrAuftrag =currAuftrag.getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements();
+            var notFinishedProduktsCurrAuftrag = produktsCurrAuftrag.filter(p => p.getComponentByName("Body").getComponentByName("ProduktStatus").readValue().value.value!==productstat.FINISHED);
+            if(notFinishedProduktsCurrAuftrag.length ===1){
+                console.log("Auftrag "+currAuftrag.getComponentByName("Header").getComponentByName("Auftragsnummer").readValue().value.value +" finished!");
+                ProductionRuns.writeValue(new opcua.SessionContext({server: server}), new opcua.DataValue({value: new opcua.Variant({dataType: "Boolean",value:false}),statusCode: opcua.StatusCodes.Good}),function(err){})
+            }
             var maschineFinishedOn = response.outputArguments[0].value
             produkt.getComponentByName("Body").getComponentByName("ProduktStatus").writeValue(new opcua.SessionContext({server: server}), new opcua.DataValue({value: new opcua.Variant({dataType: "String",value:productstat.READY}),statusCode: opcua.StatusCodes.Good}),function(err){});
             var aktCap = getCurrentCapability(produkt);
