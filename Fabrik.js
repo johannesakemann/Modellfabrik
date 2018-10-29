@@ -11,7 +11,7 @@ var productstat = require('./productstatus.json');
 
 var server = new opcua.OPCUAServer({
     port: 4337, // the port of the listening socket of the server
-    maxAllowedSessionNumber: 100,
+    maxAllowedSessionNumber: 200,
     resourcePath: "UA/modellfabrik", // this path will be added to the endpoint resource name
     nodeset_filename: [opcua.standard_nodeset_file], //"/home/pi/modellfabrik/aas_for_import.xml"],
      buildInfo : {
@@ -1222,7 +1222,7 @@ function post_initialize() {
         function getBestMaschineCurrentCap(produkt, fn){
             var aktCap = getCurrentCapability(produkt);
             var availableMachinesforCap = aktCap.getFolderElements();
-            console.log(availableMachinesforCap);
+            //console.log(availableMachinesforCap);
             var counterMachines =0;
             //TODO: Statusänderung des Produktes wenn es keine Maschinen gibt, die die Capability bearbeiten können
             if (availableMachinesforCap.length === 0){
