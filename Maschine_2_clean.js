@@ -454,13 +454,13 @@ function post_initialize() {
                         inputArguments:[
                             {
                                 dataType: "Int32",
-                                value:outputgoalA
+                                value:0
                             },{
                                 dataType: "Int32",
                                 value: OutputA.readValue().value.value
                             },{
                                 dataType: "Int32",
-                                value: outputgoalB
+                                value: 0
                             },{
                                 dataType: "Int32",
                                 value: OutputB.readValue().value.value
