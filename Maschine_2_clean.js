@@ -624,6 +624,66 @@ function post_initialize() {
         });
         OutputB.addReference({referenceType: "OrganizedBy",nodeId: Produktion});
 
+//***** Informationen über aktuelles Produkt */
+        var CurrentProductNumber = addressSpace.addVariable({
+            componentOf: Machine_2.getComponentByName("Body"),
+            browseName:"CurrentProductNumber",
+            dataType: "String",
+            value:{
+                get: function(){
+                    var currProduct = getCurrentProdukt();
+                    if (currProduct === "NoCurrentProduct"){
+                        return new opcua.Variant({dataType:"String",value: "NoCurrentProduct"})
+                    }else{
+                        var valueToReturn = currProduct.getComponentByName("Header").getComponentByName("Produktnummer").readValue().value.value;
+                        return new opcua.Variant({dataType: "String",value: valueToReturn.toString()});
+                    }
+                }
+            }
+        });
+        CurrentProductNumber.addReference({referenceType:"OrganizedBy",nodeId: Produktion});
+        var CurrentProductType = addressSpace.addVariable({
+            componentOf: Machine_2.getComponentByName("Body"),
+            browseName: "CurrentProductType",
+            dataType:"String",
+            value:{
+                get: function(){
+                    var currProduct = getCurrentProdukt();
+                    if (currProduct === "NoCurrentProduct"){
+                        return new opcua.Variant({dataType:"String",value: "NoCurrentProduct"})
+                    }else{
+                        var valueToReturn = currProduct.getComponentByName("Header").getComponentByName("ProduktTyp").readValue().value.value;
+                        return new opcua.Variant({dataType: "String",value: valueToReturn});
+                    } 
+                }
+            }
+        })
+        CurrentProductType.addReference({referenceType: "OrganizedBy",nodeId: Produktion});
+        //Hilfsfunktion um aktuelles Produkt zu ermitteln
+        var productionCompletion = 0;
+        var ProductionCompletion = addressSpace.addVariable({
+            componentOf: Machine_2.getComponentByName("Body"),
+            browseName: "ProductionCompletion",
+            dataType: "Int32",
+            value:{
+                get: function(){
+                    return new opcua.Variant({dataType: "Int32", value: productionCompletion});
+                }
+            }
+
+        });
+        ProductionCompletion.addReference({referenceType: "OrganizedBy", nodeId: Produktion});
+
+        function getCurrentProdukt(){
+            var elementsOfMachineBody = Machine_2.getComponentByName("Body").getFolderElements();
+            var produktsArrayMachineBody = elementsOfMachineBody.filter(e => e.browseName.toString() === "Produkt");
+            if (produktsArrayMachineBody.length === 0){
+                return "NoCurrentProduct"
+            }else{
+                return produktsArrayMachineBody[0];
+            }
+        }        
+
 //***** OPCUA-Methode zur Erstellung des ProduktsA */
         var ProduceProductA = addressSpace.addMethod(Machine_2.getComponentByName("Body"),{
             modellingRule: "Mandatory",
@@ -654,6 +714,9 @@ function post_initialize() {
             console.log("Production ProductA: "+produktNumber+" has started");
             var productLifecycle = inputArguments[1].value;
             var newProduct = createProduct(produktNumber,productLifecycle,producttypes.A);
+            var progress = setInterval(function(){
+                productionCompletion += (100/timeToManufactureA);
+            },1000);
             setTimeout(function(){
                 // Callback mit positivem Signal und Adresse des produzierenden Moduls
                 callback(null,{
@@ -671,7 +734,11 @@ function post_initialize() {
                 });
                 //Erhöhen der OutputA Variable
                 outputA++;
+                //Aufheben des progressIntervalls
+                clearInterval(progress);
                 console.log("Production of ProductA "+produktNumber+ " is finished");
+                //productionCompletion auf 0 setzen
+                productionCompletion = 0;
                 //Nach der Produktion Availability der Produktionscapability wieder auf true setzen
                 productionAvailability = true;
                 //Nach der Produktion entfernen des Produktes von der Maschine
@@ -709,6 +776,9 @@ function post_initialize() {
             console.log("Production ProductB: "+produktNumber+" has started");
             var productLifecycle = inputArguments[1].value;
             var newProduct = createProduct(produktNumber,productLifecycle,producttypes.B);
+            var progress = setInterval(function(){
+                productionCompletion += (100/timeToManufactureB);
+            },1000);
             setTimeout(function(){
                 // Callback mit positivem Signal und Adresse des produzierenden Moduls
                 callback(null,{
@@ -726,7 +796,11 @@ function post_initialize() {
                 });
                 //Erhöhen OutputB Variable
                 outputB++;
+                //Aufheben des progressIntervalls
+                clearInterval(progress);
                 console.log("Production of ProductB "+produktNumber+ " is finished");
+                //productionCompletion auf 0 setzen
+                productionCompletion = 0;
                 //Nach der Produktion Availability der Produktionscapability wieder auf true setzen
                 productionAvailability = true;
                 //Nach der Produktion entfernen des Produktes von der Maschine
@@ -752,6 +826,15 @@ function post_initialize() {
                 },{
                     name: "OutputB",
                     dataType: "String"
+                },{
+                    name: "CurrentProductNumber",
+                    dataType: "String"
+                },{
+                    name: "CurrentProductType",
+                    dataType: "String"
+                },{
+                    name: "ProductionCompletion",
+                    dataType: "String"
                 }
             ]
         });
@@ -769,6 +852,15 @@ function post_initialize() {
                     },{
                         dataType: "String",
                         value: OutputB.nodeId.toString()
+                    },{
+                        dataType: "String",
+                        value: CurrentProductNumber.nodeId.toString()
+                    },{
+                        dataType: "String",
+                        value: CurrentProductType.nodeId.toString()
+                    },{
+                        dataType: "String",
+                        value: ProductionCompletion.nodeId.toString()
                     }
                 ]
             })
@@ -883,6 +975,8 @@ function post_initialize() {
                         //console.log(err);
                         if(err){
                             console.log("Error during methodCall of register Method: "+err);
+                        }else{
+                            console.log("Maschine2 registriert!");
                         }
                         callback(err);
                     });
@@ -897,8 +991,6 @@ function post_initialize() {
         });
         callCreateObject.execute([],new opcua.SessionContext(),function(err,result){
             if(!err){
-                console.log("Maschine_2 registriert!");
-            }else{
                 console.log(err);
             }
         })

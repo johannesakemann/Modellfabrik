@@ -90,7 +90,19 @@ function post_initialize() {
             componentOf: Monitoring
         });
 
+        var DeviceMonitoring = addressSpace.addObject({
+            browseName: "Device",
+            componentOf: Monitoring
+        })
+
+        var CurrOrderMonitoring = addressSpace.addObject({
+            browseName: "CurrentOrder",
+            componentOf: Monitoring
+        })
+
 //****** OPCUA-Methode um Node Ids der aktuellen Auftragsdaten zurückzugeben */
+        //TODO: Löschen wenns passt 
+        
         var ProvideCurrOrderData = addressSpace.addMethod(Fabrik.getComponentByName("Body"),{
             modellingRule: "Mandatory",
             browseName: "ProvideCurrentOrderData",
@@ -99,17 +111,14 @@ function post_initialize() {
                 name: "Auftragsnummer",
                 dataType: "String"
             },{
-                name: "MengeA",
+                name: "NumberProducts",
                 dataType: "String"
             },{
-                name: "MengeB",
-                dataType: "String"
-            },{
-                name: "MengeC",
+                name: "NumberFinishedProducts",
                 dataType: "String"
             }]
         });
-        ProvideCurrOrderData.addReference({referenceType: "OrganizedBy",nodeId: OrderMonitoring});
+        ProvideCurrOrderData.addReference({referenceType: "OrganizedBy",nodeId: CurrOrderMonitoring});
         ProvideCurrOrderData.bindMethod(function(inputArguments,context,callback){
             callback(null,{
                 statusCode:opcua.StatusCodes.Good,
@@ -118,13 +127,10 @@ function post_initialize() {
                     value: CurrentOrderNumber.nodeId.toString()
                 },{
                     dataType: "String",
-                    value: CurrentOrderVolumeA.nodeId.toString()
+                    value: CurrentOrderNumberOfProducts.nodeId.toString()
                 },{
                     dataType: "String",
-                    value: CurrentOrderVolumeB.nodeId.toString()
-                },{
-                    dataType: "String",
-                    value: CurrentOrderVolumeC.nodeId.toString()
+                    value: CurrentOrderNumberFinishedProducts.nodeId.toString()
                 }]
             });
         });
@@ -439,7 +445,7 @@ function post_initialize() {
             }
         });
 //****** Variablen zum Anzeigen aktueller Auftragsdaten */
-
+        
         var CurrentOrderNumber = addressSpace.addVariable({
             componentOf: Fabrik.getComponentByName("Body"),
             dataType: "String",
@@ -455,7 +461,8 @@ function post_initialize() {
                 }
             }
         });
-        CurrentOrderNumber.addReference({referenceType: "OrganizedBy",nodeId: OrderMonitoring});
+        CurrentOrderNumber.addReference({referenceType: "OrganizedBy",nodeId: CurrOrderMonitoring});
+        /*
         var CurrentOrderVolumeA = addressSpace.addVariable({
             componentOf: Fabrik.getComponentByName("Body"),
             dataType: "String",
@@ -504,7 +511,7 @@ function post_initialize() {
             }
         });
         CurrentOrderVolumeC.addReference({referenceType: "OrganizedBy",nodeId: OrderMonitoring});
-
+        
         var CurrentAuftragfinished = addressSpace.addVariable({
             componentOf: Fabrik.getComponentByName("Header"),
             dataType: "Boolean",
@@ -514,7 +521,42 @@ function post_initialize() {
                     return new opcua.Variant({dataType: "Boolean",value :auftragFinished});
                 }
             }
-        })
+        })*/
+        var CurrentOrderNumberOfProducts = addressSpace.addVariable({
+            componentOf: Fabrik.getComponentByName("Body"),
+            dataType: "String",
+            browseName:"ProductsNeededCurrentOrder",
+            value:{
+                get:function(){
+                    var currAuftrag = getCurrentAuftrag();
+                    if(currAuftrag === "NoCurrentAuftrag"){
+                        return new opcua.Variant({dataType:"String",value: "NoCurrentOrder"});
+                    }else{
+                        return new opcua.Variant({dataType:"String",value: addressSpace.findNode(currAuftrag).getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements().length.toString()});
+                    }
+                }
+            }
+        });
+        CurrentOrderNumberOfProducts.addReference({referenceType: "OrganizedBy",nodeId: CurrOrderMonitoring});
+
+        var CurrentOrderNumberFinishedProducts = addressSpace.addVariable({
+            componentOf: Fabrik.getComponentByName("Body"),
+            dataType: "String",
+            browseName: "ProductsFinishedCurrentOrder",
+            value:{
+                get: function(){
+                    var currAuftrag = getCurrentAuftrag();
+                    if(currAuftrag === "NoCurrentAuftrag"){
+                        return new opcua.Variant({dataType:"String",value: "NoCurrentOrder"});
+                    }else{
+                        var valueToReturn = addressSpace.findNode(currAuftrag).getComponentByName("Body").getComponentByName("Zugehoerige Produkte").getFolderElements().filter(e => e.getComponentByName("Body").getComponentByName("ProduktStatus").readValue().value.value === productstat.FINISHED).length;
+                        return new opcua.Variant({dataType:"String", value: valueToReturn.toString()});
+                    }
+                }
+            }
+        });
+        CurrentOrderNumberFinishedProducts.addReference({referenceType: "OrganizedBy",nodeId:CurrOrderMonitoring});
+
 //****** Methode zum Anlegen von Aufträgen */
 
         var createAuftrag = addressSpace.addMethod(Fabrik.getComponentByName("Body"), {
@@ -1116,9 +1158,10 @@ function post_initialize() {
                             if (response == null){
                                 //TODO: Throw some error
                             }
+                            var currCap = getCurrentCapability(produkt).browseName.toString();
                             var productionPossible = response.outputArguments[5].value;
                             //TODO: Remove this Output!
-                            console.log("Production of "+produkt.getComponentByName("Header").getComponentByName("Produktnummer").readValue().value.value+ " auf "+bestMachine.browseName.toString()+" possible: "+productionPossible);
+                            console.log(currCap+" of "+produkt.getComponentByName("Header").getComponentByName("Produktnummer").readValue().value.value+ " auf "+bestMachine.browseName.toString()+" possible: "+productionPossible);
                             //Wenn frei, dann platzieren der Produktion.
                             if(productionPossible){
                                 placeOrder(produkt,bestMachine, function(){
@@ -1648,6 +1691,185 @@ function post_initialize() {
             var createdProduct = createProduct(currAuftrag,producttypes.C,[capabilities.PRODUCING,inputArguments[0].value]);
             callback();
         });
+
+//**** Methode zum Freigeben von Order Daten */
+
+        var ProvideOrderData = addressSpace.addMethod(Fabrik.getComponentByName("Body"),{
+            modellingRule: "Mandatory",
+            browseName: "ProvideOrderData",
+            inputArguments: [],
+            outputArguments: [
+                {
+                    dataType: "String",
+                    name: "OrderIds"
+                },
+                {
+                    dataType: "String",
+                    name: "OrderStatus"
+                },
+                {
+                    dataType: "String",
+                    name: "OrderAmountAs"
+                },
+                {
+                    dataType: "String",
+                    name: "OrderAmuntBs"
+                },
+                {
+                    dataType: "String",
+                    name: "OrderAmountCs"
+                }
+            ]
+        });
+        ProvideOrderData.bindMethod(function(inputArguments,context,callback){
+            callback(null,{
+                statusCode: opcua.StatusCodes.Good,
+                outputArguments:[{
+                    dataType: "String",
+                    value: OrderIds.nodeId.toString()
+                },{
+                    dataType: "String",
+                    value: OrderStatus.nodeId.toString()
+                },{
+                    dataType: "String",
+                    value: OrderProductAs.nodeId.toString()
+                },{
+                    dataType: "String",
+                    value: OrderProductBs.nodeId.toString()
+                },{
+                    dataType: "String",
+                    value: OrderProductCs.nodeId.toString()
+                }]
+            })
+        });
+        ProvideOrderData.addReference({referenceType:"OrganizedBy",nodeId:OrderMonitoring});
+
+
+//**** Variablen die die Auftragsdaten storen */
+
+        var OrderIds = addressSpace.addVariable({
+            componentOf: Fabrik.getComponentByName("Body"),
+            browseName: "OrderIds",
+            arrayType: opcua.VariantArrayType.Array,
+            dataType: "Int32",
+            value:{
+                get: function(){
+                    var valueToReturn = Auftragsordner.getFolderElements().map(e => e.getComponentByName("Header").getComponentByName("Auftragsnummer").readValue().value.value);
+                    return new opcua.Variant({dataType: "Int32", arrayType: opcua.VariantArrayType.Array, value: valueToReturn});
+                }
+            }
+        });
+        OrderIds.addReference({referenceType:"OrganizedBy",nodeId:OrderMonitoring});
+
+        var OrderProductAs = addressSpace.addVariable({
+            browseName: "OrderProductsA",
+            componentOf: Fabrik.getComponentByName("Body"),
+            arrayType: opcua.VariantArrayType.Array,
+            dataType: "Int32",
+            value:{
+                get: function(){
+                    var valueToReturn = Auftragsordner.getFolderElements().map(e => e.getComponentByName("Body").getComponentByName("BestellmengeA").readValue().value.value);
+                    return new opcua.Variant({dataType: "Int32", arrayType: opcua.VariantArrayType.Array, value: valueToReturn});
+                }
+            }
+        });
+        OrderProductAs.addReference({referenceType:"OrganizedBy",nodeId:OrderMonitoring});
+        var OrderProductBs = addressSpace.addVariable({
+            browseName: "OrderProductsB",
+            componentOf: Fabrik.getComponentByName("Body"),
+            arrayType: opcua.VariantArrayType.Array,
+            dataType: "Int32",
+            value:{
+                get: function(){
+                    var valueToReturn = Auftragsordner.getFolderElements().map(e => e.getComponentByName("Body").getComponentByName("BestellmengeB").readValue().value.value);
+                    return new opcua.Variant({dataType: "Int32", arrayType: opcua.VariantArrayType.Array, value: valueToReturn});
+                }
+            }
+        });
+        OrderProductBs.addReference({referenceType:"OrganizedBy",nodeId:OrderMonitoring});
+        var OrderProductCs = addressSpace.addVariable({
+            browseName: "OrderProductsC",
+            componentOf: Fabrik.getComponentByName("Body"),
+            arrayType: opcua.VariantArrayType.Array,
+            dataType: "Int32",
+            value:{
+                get: function(){
+                    var valueToReturn = Auftragsordner.getFolderElements().map(e => e.getComponentByName("Body").getComponentByName("BestellmengeC").readValue().value.value);
+                    return new opcua.Variant({dataType: "Int32", arrayType: opcua.VariantArrayType.Array, value: valueToReturn});
+                }
+            }
+        });
+        OrderProductCs.addReference({referenceType:"OrganizedBy",nodeId:OrderMonitoring});
+        var OrderStatus = addressSpace.addVariable({
+            browseName: "OrderProductStatus",
+            componentOf: Fabrik.getComponentByName("Body"),
+            arrayType: opcua.VariantArrayType.Array,
+            dataType: "String",
+            value:{
+                get: function(){
+                    var valueToReturn = Auftragsordner.getFolderElements().map(e => e.getComponentByName("Header").getComponentByName("Auftragsstatus").readValue().value.value);
+                    return new opcua.Variant({dataType: "String", arrayType: opcua.VariantArrayType.Array, value: valueToReturn});
+                }
+            }
+        });
+        OrderStatus.addReference({referenceType:"OrganizedBy",nodeId:OrderMonitoring});
+        
+//**** Methode um Devices zu monitoren */
+        var ProvideDeviceData = addressSpace.addMethod(Fabrik.getComponentByName("Body"),{
+            modellingRule: "Mandatory",
+            browseName: "ProvideDeviceData",
+            inputArguments:[],
+            outputArguments:[{
+                dataType:"String",
+                name: "DeviceTyp"
+            },{
+                dataType: "String",
+                name: "DeviceIDs"
+            }]
+        })
+        ProvideDeviceData.addReference({referenceType: "OrganizedBy",nodeId: DeviceMonitoring});
+        ProvideDeviceData.bindMethod(function(inputArguments,context,callback){
+            callback(null,{
+                statusCode: opcua.StatusCodes.Good,
+                outputArguments:[{
+                    dataType: "String",
+                    value: DeviceTypes.nodeId.toString()
+                },{
+                    dataType: "String",
+                    value: DeviceIds.nodeId.toString()
+                }]
+            })
+        });
+
+//***** Variablen um DeviceDaten Anzuzeigen */     
+        var DeviceTypes = addressSpace.addVariable({
+            browseName: "DeviceTypes",
+            componentOf: Fabrik.getComponentByName("Body"),
+            arrayType: opcua.VariantArrayType.Array,
+            dataType: "String",
+            value:{
+                get: function(){
+                    var valueToReturn = Geraeteordner.getFolderElements().map(e => e.getComponentByName("Header").getComponentByName("GeraeteTyp").readValue().value.value);
+                    return new opcua.Variant({dataType: "String", arrayType: opcua.VariantArrayType.Array, value: valueToReturn});
+                }
+            }
+        });
+        DeviceTypes.addReference({referenceType: "OrganizedBy",nodeId: DeviceMonitoring});
+
+        var DeviceIds = addressSpace.addVariable({
+            browseName: "DeviceIds",
+            componentOf: Fabrik.getComponentByName("Body"),
+            arrayType: opcua.VariantArrayType.Array,
+            dataType: "Int32",
+            value:{
+                get: function(){
+                    var valueToReturn = Geraeteordner.getFolderElements().map(e => e.getComponentByName("Header").getPropertyByName("SerialNumber").readValue().value.value);
+                    return new opcua.Variant({dataType: "Int32", arrayType: opcua.VariantArrayType.Array, value: valueToReturn});
+                }
+            }
+        });
+        DeviceIds.addReference({referenceType: "OrganizedBy",nodeId: DeviceMonitoring});
+
     }
 
 //****** Servererstellung */
