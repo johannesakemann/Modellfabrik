@@ -1158,9 +1158,10 @@ function post_initialize() {
                             if (response == null){
                                 //TODO: Throw some error
                             }
+                            var currCap = getCurrentCapability(produkt).browseName.toString();
                             var productionPossible = response.outputArguments[5].value;
                             //TODO: Remove this Output!
-                            console.log("Production of "+produkt.getComponentByName("Header").getComponentByName("Produktnummer").readValue().value.value+ " auf "+bestMachine.browseName.toString()+" possible: "+productionPossible);
+                            console.log(currCap+" of "+produkt.getComponentByName("Header").getComponentByName("Produktnummer").readValue().value.value+ " auf "+bestMachine.browseName.toString()+" possible: "+productionPossible);
                             //Wenn frei, dann platzieren der Produktion.
                             if(productionPossible){
                                 placeOrder(produkt,bestMachine, function(){
