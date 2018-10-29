@@ -493,9 +493,12 @@ function post_initialize() {
                     callback();
                 }
             ]);
-            //Herunterfahren des Servers.
-            //Herunterfahren node-red
-            shell.exec("node-red-stop");
+            //Herunterfahren des Pis
+            setTimeout(function(){
+                shell.exec("sudo shutdown -h now")
+            },10000)
+            //Herunterfahren Server
+            /*
             server.shutdown(10000,function(err){
                 if (!err){
                     console.log("Maschine1 wird heruntergefahren");
@@ -503,7 +506,7 @@ function post_initialize() {
                     console.log("Error during shutdown: "+err);
                 }
                 //callback();
-            })
+            })*/
         })
 //***** Instanzieren LED       
         var LED = AssetType.instantiate({
@@ -1463,6 +1466,5 @@ function post_initialize() {
     });
 }
 server.initialize(post_initialize);
-shell.exec("node-red-start");
 
 

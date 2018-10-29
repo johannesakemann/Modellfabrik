@@ -1890,4 +1890,3 @@ function post_initialize() {
     });
 }
 server.initialize(post_initialize);
-shell.exec("node-red-start");
