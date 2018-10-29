@@ -23,7 +23,7 @@ var server = new opcua.OPCUAServer({
     }
 });
 
-var endpointFabrik = "opc.tcp://Johanness-MacBook-Pro-1434.local:4337/UA/modellfabrik";
+var endpointFabrik = "opc.tcp://MHraspberry:4337/UA/modellfabrik";
 var endpointAssembler = server.endpoints[0].endpointDescriptions()[0].endpointUrl;
 
 var client =  new opcua.OPCUAClient();
